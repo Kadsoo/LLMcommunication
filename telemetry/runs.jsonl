@@ -206,3 +206,23 @@
 {"t": 1788531634.929, "event": "compare", "question": "Ted starts with $200. He buys 3 books for 16 dollars each and 3 pencils for 6 dollars each. How much did he spend in total?", "answer": "66", "category": "gsm8k", "tok_strict": false, "tok_loose": false, "tok_s": 21.36, "tok_bytes": 397, "kv_strict": false, "kv_loose": false, "kv_s": 28.25, "kv_bytes": 16073979}
 {"t": 1788531678.988, "event": "compare", "question": "Eve had 20 pieces of pomelos. After giving her friend some pomelos, Eve is left with 1/4 of the pomelos she originally had. How many pomelos did Eve give away?", "answer": "15", "category": "gsm8k", "tok_strict": true, "tok_loose": true, "tok_s": 21.88, "tok_bytes": 327, "kv_strict": true, "kv_loose": true, "kv_s": 22.17, "kv_bytes": 18367739}
 {"t": 1788531725.649, "event": "compare", "question": "The Doubtfire sisters are driving home with 7 kittens adopted from the local animal shelter when their mother calls to inform them that their two house cats have just had kittens. She says that Patchy, the first cat, has had thrice the number of adopted kittens, while Trixie, the other cat, has had 12. How many kittens does the Doubtfire family now have?", "answer": "40", "category": "gsm8k", "tok_strict": false, "tok_loose": false, "tok_s": 22.6, "tok_bytes": 532, "kv_strict": false, "kv_loose": false, "kv_s": 24.06, "kv_bytes": 26395899}
+{"t": 1788534261.169, "event": "delta_kv", "prompt_len": 50, "full_bytes": 11484475, "delta_bytes": 15154747, "ratio": 0.8, "equiv": false}
+{"t": 1788534274.838, "event": "delta_kv", "prompt_len": 100, "full_bytes": 22953531, "delta_bytes": 26623547, "ratio": 0.9, "equiv": false}
+{"t": 1788534289.209, "event": "delta_kv", "prompt_len": 200, "full_bytes": 45891131, "delta_bytes": 49561147, "ratio": 0.9, "equiv": false}
+{"t": 1788534305.489, "event": "delta_kv", "prompt_len": 400, "full_bytes": 91766331, "delta_bytes": 95436347, "ratio": 1.0, "equiv": true}
+{"t": 1788534325.389, "event": "delta_kv", "prompt_len": 800, "full_bytes": 183516859, "delta_bytes": 187187003, "ratio": 1.0, "equiv": true}
+{"t": 1788534395.973, "event": "delta_kv", "prompt_len": 50, "full_bytes": 11484475, "delta_bytes": 15154747, "ratio": 0.8, "equiv": false}
+{"t": 1788534407.174, "event": "delta_kv", "prompt_len": 100, "full_bytes": 22953531, "delta_bytes": 26623547, "ratio": 0.9, "equiv": false}
+{"t": 1788534421.648, "event": "delta_kv", "prompt_len": 200, "full_bytes": 45891131, "delta_bytes": 49561147, "ratio": 0.9, "equiv": false}
+{"t": 1788534437.081, "event": "delta_kv", "prompt_len": 400, "full_bytes": 91766331, "delta_bytes": 95436347, "ratio": 1.0, "equiv": true}
+{"t": 1788534457.551, "event": "delta_kv", "prompt_len": 800, "full_bytes": 183516859, "delta_bytes": 187187003, "ratio": 1.0, "equiv": true}
+{"t": 1788534715.282, "event": "delta_kv", "prompt_len": 50, "full_bytes": 11468800, "delta_bytes": 3670016, "ratio": 3.1, "equiv": true}
+{"t": 1788534725.994, "event": "delta_kv", "prompt_len": 100, "full_bytes": 22937600, "delta_bytes": 3670016, "ratio": 6.2, "equiv": true}
+{"t": 1788534738.923, "event": "delta_kv", "prompt_len": 200, "full_bytes": 45875200, "delta_bytes": 3670016, "ratio": 12.5, "equiv": true}
+{"t": 1788534752.458, "event": "delta_kv", "prompt_len": 400, "full_bytes": 91750400, "delta_bytes": 3670016, "ratio": 25.0, "equiv": true}
+{"t": 1788534772.26, "event": "delta_kv", "prompt_len": 800, "full_bytes": 183500800, "delta_bytes": 3670016, "ratio": 50.0, "equiv": true}
+{"t": 1788534832.568, "event": "delta_kv", "prompt_len": 50, "full_bytes": 11468800, "delta_bytes": 3670016, "ratio": 3.1, "equiv": true}
+{"t": 1788534845.542, "event": "delta_kv", "prompt_len": 100, "full_bytes": 22937600, "delta_bytes": 3670016, "ratio": 6.2, "equiv": true}
+{"t": 1788534857.143, "event": "delta_kv", "prompt_len": 200, "full_bytes": 45875200, "delta_bytes": 3670016, "ratio": 12.5, "equiv": true}
+{"t": 1788534872.239, "event": "delta_kv", "prompt_len": 400, "full_bytes": 91750400, "delta_bytes": 3670016, "ratio": 25.0, "equiv": true}
+{"t": 1788534889.382, "event": "delta_kv", "prompt_len": 800, "full_bytes": 183500800, "delta_bytes": 3670016, "ratio": 50.0, "equiv": true}
