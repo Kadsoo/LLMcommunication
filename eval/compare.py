@@ -10,8 +10,10 @@ from eval.dataset import load_dataset
 from eval.check_answer import is_correct
 
 MODEL = "Qwen/Qwen3-0.6B"
-K, M = 16, 48
-MAX_N = 96
+K, M = 16, 112
+MAX_N = 128
+
+PROMPT_TMPL = "Question: {q}\nSolve it briefly. End your answer with the final number only.\nAnswer:"
 
 tok = AutoTokenizer.from_pretrained(MODEL, trust_remote_code=True)
 model = AutoModelForCausalLM.from_pretrained(MODEL, dtype=torch.float32, trust_remote_code=True)
@@ -35,13 +37,16 @@ def gen_prefix_kv(prompt, k):
     return seq, kv, round(time.time()-t0,2)
 
 def cont_from_kv(seq, kv, m):
-    last = seq[:,-1:]; t0=time.time()
+    """B端从恢复的KV手动贪心续到EOS或上限, 与TOKEN模式同停止策略."""
+    last = seq[:, -1:]; t0 = time.time()
     with torch.no_grad():
         for _ in range(m):
             o = model(last, past_key_values=kv, use_cache=True)
-            last = o.logits[:,-1,:].argmax(-1, keepdim=True); kv=o.past_key_values
-            seq = torch.cat([seq,last],1)
-    return tok.decode(seq[0], skip_special_tokens=True), round(time.time()-t0,2)
+            last = o.logits[:, -1, :].argmax(dim=-1, keepdim=True); kv = o.past_key_values
+            seq = torch.cat([seq, last], dim=1)
+            if last.item() == tok.eos_token_id:
+                break
+    return tok.decode(seq[0], skip_special_tokens=True), round(time.time() - t0, 2)
 
 def main():
     ds = load_dataset()
@@ -50,13 +55,13 @@ def main():
         q, ans, cat = d["question"], d["answer"], d["category"]
         # TOKEN模式
         t0=time.time()
-        a_full, ta, na = gen_full(f"Question: {q}\nAnswer:", MAX_N)
+        a_full, ta, na = gen_full(PROMPT_TMPL.format(q=q), MAX_N)
         payload_tok = len(a_full.encode())
         st, lo = is_correct(a_full, ans)
         t_tok = round(time.time()-t0,2)
         # KV模式
         t0=time.time()
-        seq, kv, tA = gen_prefix_kv(f"Question: {q}\nAnswer:", K)
+        seq, kv, tA = gen_prefix_kv(PROMPT_TMPL.format(q=q), K)
         b = serialize_kv(kv); kv2 = deserialize_kv(b)
         txt, tB = cont_from_kv(seq, kv2, M)
         sk, lk = is_correct(txt, ans)

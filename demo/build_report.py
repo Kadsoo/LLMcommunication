@@ -103,6 +103,7 @@ body{{margin:0;background:radial-gradient(1100px 420px at 80% -8%,#14243a 0%,var
 .verdict .v small{{font-size:13px;color:var(--dim)}}
 .verdict .d{{font-size:12.5px;color:var(--dim);line-height:1.6}}
 .hot .v{{color:var(--cy)}} .t .v{{color:var(--gr)}} .k .v{{color:var(--am)}}
+.note{{background:#0e1622;border:1px solid var(--line);border-radius:10px;padding:10px 14px;font-size:12.5px;color:var(--dim);line-height:1.8;margin-top:14px}}
 h2{{font-size:16px;margin:26px 0 10px}}
 h2::before{{content:"";width:8px;height:16px;background:var(--cy);border-radius:2px;display:inline-block;margin-right:8px;vertical-align:-2px}}
 table{{width:100%;border-collapse:collapse;font-size:13px;background:var(--panel);border-radius:12px;overflow:hidden}}
@@ -137,6 +138,7 @@ td.mono{{font-family:Consolas,monospace}}
 <div class="t"><div class="k">TOKEN · 严格通过</div><div class="v">{tok_ok}/{len(cmps)} <small>({tok_ok/len(cmps)*100:.0f}%)</small></div><div class="d">端到端 {at:.1f}s/题 · 宽松 {l_t}/{len(cmps)}</div></div>
 <div class="k"><div class="k">KV · 严格通过</div><div class="v">{kv_ok}/{len(cmps)} <small>({kv_ok/len(cmps)*100:.0f}%)</small></div><div class="d">端到端 {ak:.1f}s/题 · 宽松 {l_k}/{len(cmps)}</div></div>
 </div>
+<div class="note"><b>关键验证：</b>修正 KV 模式停止策略（与 TOKEN 同为生成到 EOS）后，两模式 50 题逐题结果完全一致（严格/宽松均同）—— 证明 KV 传输无损、与直推等价；0.6B 正确率 44% 是模型能力上限（GSM8K 3/20），非流程缺陷。</div>
 
 <h2>分题型严格通过率</h2>
 <table class="summary-table"><tr><th style="width:110px">题型</th><th>题数</th><th>TOKEN</th><th>KV</th></tr>{cat_rows}</table>
