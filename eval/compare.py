@@ -1,4 +1,4 @@
-"""P6 Step7: 同题对比 TOKEN vs KV (成功率/时延/传输量)."""
+"""P6 Step7: 50题同题对比 TOKEN vs KV (成功率strict/loose, 时延, 传输量, 分题型)."""
 import sys, time
 from pathlib import Path
 ROOT = str(Path(__file__).resolve().parents[1]); sys.path.insert(0, ROOT)
@@ -6,16 +6,12 @@ import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from transport.adapter import serialize_kv, deserialize_kv
 from telemetry.logger import log
+from eval.dataset import load_dataset
+from eval.check_answer import is_correct
 
 MODEL = "Qwen/Qwen3-0.6B"
-QS = [
-    ("Janet 3 apples +5, total?", "8"),
-    ("60km/h *3h = ?", "180"),
-    ("30 bees leave, half return, returned?", "15"),
-    ("10-4 = ?", "6"),
-    ("2+3*4 = ?", "14"),
-]
 K, M = 16, 48
+MAX_N = 96
 
 tok = AutoTokenizer.from_pretrained(MODEL, trust_remote_code=True)
 model = AutoModelForCausalLM.from_pretrained(MODEL, dtype=torch.float32, trust_remote_code=True)
@@ -47,31 +43,50 @@ def cont_from_kv(seq, kv, m):
             seq = torch.cat([seq,last],1)
     return tok.decode(seq[0], skip_special_tokens=True), round(time.time()-t0,2)
 
-rows=[]
-for q, exp in QS:
-    # TOKEN模式: A全量生成后传文本
-    t0=time.time()
-    a_full, ta, na = gen_full(f"Question: {q}\nAnswer:", 64)
-    payload_tok = len(a_full.encode())
-    ok_t = exp in a_full
-    t_tok = round(time.time()-t0,2)
-    # KV模式: A生成K步传KV, B续M步
-    t0=time.time()
-    seq, kv, tA = gen_prefix_kv(f"Question: {q}\nAnswer:", K)
-    b = serialize_kv(kv); kv2 = deserialize_kv(b)
-    txt, tB = cont_from_kv(seq, kv2, M)
-    ok_k = exp in txt
-    t_kv = round(time.time()-t0,2)
-    rows.append({"q":q,"tok_ok":ok_t,"tok_s":t_tok,"tok_bytes":payload_tok,"tok_n":na,
-                 "kv_ok":ok_k,"kv_s":t_kv,"kv_bytes":len(b)})
-    d = dict(rows[-1]); d.pop("q"); log("compare", question=q, **d)
-    print(f"{q} | TOK ok={ok_t} {t_tok}s {payload_tok}B | KV ok={ok_k} {t_kv}s {len(b)}B", flush=True)
+def main():
+    ds = load_dataset()
+    rows = []
+    for i, d in enumerate(ds, 1):
+        q, ans, cat = d["question"], d["answer"], d["category"]
+        # TOKEN模式
+        t0=time.time()
+        a_full, ta, na = gen_full(f"Question: {q}\nAnswer:", MAX_N)
+        payload_tok = len(a_full.encode())
+        st, lo = is_correct(a_full, ans)
+        t_tok = round(time.time()-t0,2)
+        # KV模式
+        t0=time.time()
+        seq, kv, tA = gen_prefix_kv(f"Question: {q}\nAnswer:", K)
+        b = serialize_kv(kv); kv2 = deserialize_kv(b)
+        txt, tB = cont_from_kv(seq, kv2, M)
+        sk, lk = is_correct(txt, ans)
+        t_kv = round(time.time()-t0,2)
+        r = {"q": q, "ans": ans, "cat": cat,
+             "tok_strict": st, "tok_loose": lo, "tok_s": t_tok, "tok_bytes": payload_tok,
+             "kv_strict": sk, "kv_loose": lk, "kv_s": t_kv, "kv_bytes": len(b)}
+        rows.append(r)
+        log("compare", question=q, answer=ans, category=cat, **{k: v for k, v in r.items() if k not in ("q", "ans", "cat")})
+        print(f"[{i:02d}/{len(ds)}] {cat:12s} TOK {st}/{lo} {t_tok:5.1f}s {payload_tok:6d}B | KV {sk}/{lk} {t_kv:5.1f}s {len(b):8d}B | {q[:52]}", flush=True)
 
-# 结果表
-s_t = sum(r["tok_ok"] for r in rows); s_k = sum(r["kv_ok"] for r in rows)
-md = ["| 模式 | 成功率 | 平均时延 | 平均传输量 |", "|---|---|---|---|",
- f"| TOKEN | {s_t}/5 | {sum(r['tok_s'] for r in rows)/5:.2f}s | {sum(r['tok_bytes'] for r in rows)/5:.0f}B |",
- f"| KV | {s_k}/5 | {sum(r['kv_s'] for r in rows)/5:.2f}s | {sum(r['kv_bytes'] for r in rows)/5:.0f}B |",
- "", "注: CPU实测, KV负载大但省Prefill; 上GPU/服务器后时延比会更明显。"]
-Path(ROOT,"eval","results_table.md").write_text("\n".join(md), encoding="utf-8")
-print("\n".join(md))
+    n = len(rows)
+    s_t = sum(r["tok_strict"] for r in rows); l_t = sum(r["tok_loose"] for r in rows)
+    s_k = sum(r["kv_strict"] for r in rows); l_k = sum(r["kv_loose"] for r in rows)
+    at = sum(r["tok_s"] for r in rows) / n; ak = sum(r["kv_s"] for r in rows) / n
+    bt = sum(r["tok_bytes"] for r in rows) / n; bk = sum(r["kv_bytes"] for r in rows) / n
+    md = ["## 总体 (50题, Qwen3-0.6B 本机CPU)", "| 模式 | 严格通过 | 宽松通过 | 平均时延 | 平均传输量 |",
+          "|---|---|---|---|---|",
+          f"| TOKEN | {s_t}/{n} ({s_t/n*100:.0f}%) | {l_t}/{n} | {at:.2f}s | {bt:.0f}B |",
+          f"| KV | {s_k}/{n} ({s_k/n*100:.0f}%) | {l_k}/{n} | {ak:.2f}s | {bk:.0f}B |", ""]
+    cats = sorted({r["cat"] for r in rows})
+    md.append("## 分题型 (严格通过率)")
+    md.append("| 题型 | 题数 | TOKEN | KV |")
+    md.append("|---|---|---|---|")
+    for c in cats:
+        sub = [r for r in rows if r["cat"] == c]
+        ts = sum(r["tok_strict"] for r in sub); ks = sum(r["kv_strict"] for r in sub)
+        md.append(f"| {c} | {len(sub)} | {ts}/{len(sub)} | {ks}/{len(sub)} |")
+    Path(ROOT, "eval", "results_table.md").write_text("\n".join(md), encoding="utf-8")
+    print("\n".join(md))
+
+if __name__ == "__main__":
+    main()

@@ -26,7 +26,11 @@ tcp_b = next((r for r in runs if r.get("event") == "tcp_b"), {})
 # ---- KPI ----
 tm_ok = sum(1 for r in textmas if r.get("correct"))
 tm_n = len(textmas)
-tok_ok = sum(1 for r in cmps if r.get("tok_ok")); kv_ok = sum(1 for r in cmps if r.get("kv_ok"))
+cmps = cmps[-50:]
+tok_ok = sum(1 for r in cmps if r.get("tok_strict")); kv_ok = sum(1 for r in cmps if r.get("kv_strict"))
+l_t = sum(1 for r in cmps if r.get("tok_loose")); l_k = sum(1 for r in cmps if r.get("kv_loose"))
+at = sum(r.get("tok_s", 0) for r in cmps) / max(len(cmps), 1)
+ak = sum(r.get("kv_s", 0) for r in cmps) / max(len(cmps), 1)
 avg_tok_b = sum(r.get("tok_bytes", 0) for r in cmps) / max(len(cmps), 1)
 avg_kv_b = sum(r.get("kv_bytes", 0) for r in cmps) / max(len(cmps), 1)
 ratio = avg_kv_b / max(avg_tok_b, 1)
@@ -41,9 +45,10 @@ def bar(b, cls):
     return f"<div class='bar {cls}' style='width:{w:.1f}%'></div>"
 qrows = ""
 for r in cmps:
-    ti = "✓" if r.get("tok_ok") else "✗"; ki = "✓" if r.get("kv_ok") else "✗"
-    tc = "y" if r.get("tok_ok") else "n"; kc = "y" if r.get("kv_ok") else "n"
-    qrows += (f"<tr><td class='q'>{esc(r.get('question',''))}</td>"
+    ti = "✓" if r.get("tok_strict") else "✗"; ki = "✓" if r.get("kv_strict") else "✗"
+    tc = "y" if r.get("tok_strict") else "n"; kc = "y" if r.get("kv_strict") else "n"
+    qrows += (f"<tr><td class='q'>{esc(r.get('question',''))[:70]}</td>"
+              f"<td>{esc(r.get('category',''))}</td>"
               f"<td class='{tc}'>{ti} · {r.get('tok_s','?')}s · {fmt_bytes(r.get('tok_bytes',0))}</td>"
               f"<td class='{kc}'>{ki} · {r.get('kv_s','?')}s · {fmt_bytes(r.get('kv_bytes',0))}</td></tr>")
 
@@ -116,17 +121,17 @@ th{{color:var(--dim);font-weight:600;background:#0e1622}}td.q{{max-width:260px}}
 <div class="sub">TextMAS → Transport 接口 → TCP 跨进程 → Telemetry → KV 传输 → Token/KV 对比 → 可视化 ｜ 服务器阶段切 4B ｜ Step9 LabTransport 预留</div>
 <div class="kpis">
 <div class="kpi hot"><div class="k">核心结论 · 传输代价</div><div class="v">{ratio:,.0f}×</div><div class="d">KV 平均 {fmt_bytes(avg_kv_b)} vs TOKEN 平均 {fmt_bytes(avg_tok_b)}。<br>无损但极重 —— 压缩即 Step10 方向。</div></div>
-<div class="kpi"><div class="k">成功率</div><div class="v">{tok_ok}/{len(cmps)} <small>vs</small> {kv_ok}/{len(cmps)}</div><div class="d">TOKEN vs KV 同题对比，两边打平（CPU 实测约 10.8s/题）。</div></div>
+<div class="kpi"><div class="k">成功率 · 50题严格判定</div><div class="v">{tok_ok}/{len(cmps)} <small>vs</small> {kv_ok}/{len(cmps)}</div><div class="d">TOKEN vs KV 同题对比（自编30+GSM8K 20），KV 端到端平均 {ak:.1f}s vs TOKEN {at:.1f}s。</div></div>
 <div class="kpi"><div class="k">KV 无损验证</div><div class="v">✓ EQUIV</div><div class="d">续写与单机直推逐 token 一致。<br>载荷 {fmt_bytes(kv_bytes_eq)} / {kv_layers} 层。</div></div>
-<div class="kpi"><div class="k">跨进程 TCP</div><div class="v">{net_s}<small>s</small></div><div class="d">双进程 A→B→A 真实走网，B 推理 {tcp_b.get('infer_s','?')}s。<br>TextMAS 单机 {tm_ok}/{tm_n} 全对。</div></div>
+<div class="kpi"><div class="k">跨进程 TCP</div><div class="v">{net_s}<small>s</small></div><div class="d">双进程 A→B→A 真实走网，B 推理 {tcp_b.get('infer_s','?')}s。<br>TextMAS 单机 {tm_ok}/{tm_n}。</div></div>
 </div>
-<h2>TOKEN vs KV —— 同题对比</h2>
+<h2>TOKEN vs KV —— 同题对比（50题）</h2>
 <div class="duel">
-<div class="mode t"><h3>TOKEN 模式 · 传文本</h3><div class="big">{fmt_bytes(avg_tok_b)} / 题</div>{bar(avg_tok_b,'t')}<div class="sub">成功 {tok_ok}/{len(cmps)} ｜ 轻量，语义有损耗风险</div></div>
-<div class="mode k"><h3>KV 模式 · 传 past_key_values</h3><div class="big">{fmt_bytes(avg_kv_b)} / 题</div>{bar(avg_kv_b,'k')}<div class="sub">成功 {kv_ok}/{len(cmps)} ｜ 无损，负载约 {ratio:,.0f} 倍</div></div>
+<div class="mode t"><h3>TOKEN 模式 · 传文本</h3><div class="big">{fmt_bytes(avg_tok_b)} / 题</div>{bar(avg_tok_b,'t')}<div class="sub">严格 {tok_ok}/{len(cmps)} · 宽松 {l_t}/{len(cmps)} ｜ 轻量，语义有损耗风险</div></div>
+<div class="mode k"><h3>KV 模式 · 传 past_key_values</h3><div class="big">{fmt_bytes(avg_kv_b)} / 题</div>{bar(avg_kv_b,'k')}<div class="sub">严格 {kv_ok}/{len(cmps)} · 宽松 {l_k}/{len(cmps)} ｜ 无损，负载约 {ratio:,.0f} 倍</div></div>
 </div>
 <p style="height:8px"></p>
-<table><tr><th>题目</th><th>TOKEN（结果·耗时·负载）</th><th>KV（结果·耗时·负载）</th></tr>{qrows}</table>
+<table><tr><th>题目</th><th>题型</th><th>TOKEN（结果·耗时·负载）</th><th>KV（结果·耗时·负载）</th></tr>{qrows}</table>
 <h2>多智能体对话 · A → B → A（点击展开）</h2>{cards}
 <h2>遥测 Telemetry</h2>
 <table><tr><th style="width:160px">事件</th><th>指标</th></tr>{trows}</table>
