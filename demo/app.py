@@ -18,22 +18,25 @@ def load():
         return [json.loads(l) for l in p.read_text(encoding="utf-8").splitlines() if l.strip()]
     textmas = jl("agents/textmas_results.jsonl")
     runs = jl("telemetry/runs.jsonl")
-    cmps = [r for r in runs if r.get("event") == "compare"]
+    cmps = [r for r in runs if r.get("event") == "compare" and r.get("category")][-50:]
     kv = next((r for r in runs if r.get("event") == "kv_equiv"), {})
     def fmt(n):
         n = float(n or 0)
         return f"{n/1e6:.2f} MB" if n >= 1e6 else (f"{n/1e3:.1f} KB" if n >= 1e3 else f"{int(n)} B")
-    tok_ok = sum(1 for r in cmps if r.get("tok_ok")); kv_ok = sum(1 for r in cmps if r.get("kv_ok"))
+    tok_ok = sum(1 for r in cmps if r.get("tok_strict")); kv_ok = sum(1 for r in cmps if r.get("kv_strict"))
+    l_t = sum(1 for r in cmps if r.get("tok_loose")); l_k = sum(1 for r in cmps if r.get("kv_loose"))
     ab = sum(r.get("tok_bytes", 0) for r in cmps) / max(len(cmps), 1)
     ak = sum(r.get("kv_bytes", 0) for r in cmps) / max(len(cmps), 1)
     ratio = ak / max(ab, 1)
     tm_ok = sum(1 for r in textmas if r.get("correct"))
-    kpi = (f"<div class='kpi'><div>传输代价<br><b>{ratio:,.0f}×</b><br>KV {fmt(ak)} vs TOKEN {fmt(ab)}</div>"
-           f"<div>成功率<br><b>{tok_ok}/{len(cmps)} vs {kv_ok}/{len(cmps)}</b><br>TOKEN vs KV 同题</div>"
-           f"<div>KV 无损<br><b>{'✓ EQUIV' if kv.get('equiv') else '?'}</b><br>{fmt(kv.get('kv_bytes', 0))} / {kv.get('layers', '?')}层</div>"
-           f"<div>TextMAS<br><b>{tm_ok}/{len(textmas)}</b><br>A→B→A 单机</div></div>")
-    qrows = [[r.get("question", ""), "✓" if r.get("tok_ok") else "✗", r.get("tok_s", ""),
-              fmt(r.get("tok_bytes", 0)), "✓" if r.get("kv_ok") else "✗", r.get("kv_s", ""),
+    kpi = (f"<div class='kpi'><div>核心 · 传输代价<br><b>{ratio:,.0f}×</b><br>KV {fmt(ak)} vs TOKEN {fmt(ab)}</div>"
+           f"<div>成功率 · 严格<br><b>{tok_ok}/{len(cmps)} vs {kv_ok}/{len(cmps)}</b><br>TOKEN vs KV 同题 逐题一致</div>"
+           f"<div>宽松通过<br><b>{l_t}/{len(cmps)} vs {l_k}/{len(cmps)}</b><br>两模式同数</div>"
+           f"<div>KV 无损<br><b>{'✓ EQUIV' if kv.get('equiv') else '?'}</b><br>{fmt(kv.get('kv_bytes', 0))} / {kv.get('layers', '?')}层</div></div>")
+    cat_name = {"arithmetic": "算术", "word_problem": "应用题", "ratio": "比例", "logic": "逻辑", "units": "单位换算", "gsm8k": "GSM8K"}
+    qrows = [[r.get("question", "")[:90], cat_name.get(r.get("category", ""), r.get("category", "")),
+              "✓" if r.get("tok_strict") else "✗", r.get("tok_s", ""),
+              fmt(r.get("tok_bytes", 0)), "✓" if r.get("kv_strict") else "✗", r.get("kv_s", ""),
               fmt(r.get("kv_bytes", 0))] for r in cmps]
     drows = [[r.get("q", ""), str(r.get("a1", ""))[:200], str(r.get("critic", ""))[:200],
               str(r.get("a2", ""))[:200], "成功" if r.get("correct") else "失败"] for r in textmas]
@@ -43,10 +46,10 @@ def launch():
     import gradio as gr
     kpi, qrows, drows = load()
     with gr.Blocks(title="LLM通信 Step8") as demo:
-        gr.Markdown("# LLM 通信实验台 · Step8\nQwen3-0.6B 本机 ｜ 服务器阶段切 4B ｜ Step9 LabTransport 预留")
+        gr.Markdown("# LLM 通信实验台 · Step8\nQwen3-0.6B 本机 · 50题 ｜ 服务器阶段切 4B ｜ Step9 LabTransport 预留")
         gr.HTML(kpi)
-        gr.Markdown("## TOKEN vs KV 同题对比")
-        gr.Dataframe(value=qrows, headers=["题目", "TOKEN", "耗时s", "负载", "KV", "耗时s", "负载"], wrap=True)
+        gr.Markdown("## TOKEN vs KV 同题对比（最近50题）")
+        gr.Dataframe(value=qrows, headers=["题目", "题型", "TOKEN", "耗时s", "负载", "KV", "耗时s", "负载"], wrap=True)
         gr.Markdown("## 多智能体对话 A→B→A")
         gr.Dataframe(value=drows, headers=["问题", "A初答", "B批评", "A终答", "结果"], wrap=True)
     demo.launch(server_name="0.0.0.0", server_port=7860, css=CSS)
