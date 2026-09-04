@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# 模型与缓存
+.cache/
+models/
+*.safetensors
+*.bin
+*.gguf
+
+# 日志与临时
+*.log
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/

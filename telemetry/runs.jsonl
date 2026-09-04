@@ -1,0 +1,8 @@
+{"t": 1788516663.642, "event": "tcp_b", "role": "B", "infer_s": 12.27, "payload_in": 213, "payload_out": 239}
+{"t": 1788516676.116, "event": "tcp_a", "infer_s": 23.46, "net_s": 12.27, "payload": 213}
+{"t": 1788516795.651, "event": "kv_equiv", "equiv": true, "kv_bytes": 2769915, "tA": 1.39, "tB": 1.31, "layers": 28, "seq": [1, 13]}
+{"t": 1788517034.248, "event": "compare", "question": "Janet 3 apples +5, total?", "tok_ok": true, "tok_s": 10.79, "tok_bytes": 180, "tok_n": 64, "kv_ok": true, "kv_s": 10.83, "kv_bytes": 6439931}
+{"t": 1788517055.927, "event": "compare", "question": "60km/h *3h = ?", "tok_ok": true, "tok_s": 10.89, "tok_bytes": 112, "tok_n": 64, "kv_ok": true, "kv_s": 10.79, "kv_bytes": 6669307}
+{"t": 1788517077.786, "event": "compare", "question": "30 bees leave, half return, returned?", "tok_ok": false, "tok_s": 10.88, "tok_bytes": 206, "tok_n": 64, "kv_ok": false, "kv_s": 10.98, "kv_bytes": 6898683}
+{"t": 1788517099.079, "event": "compare", "question": "10-4 = ?", "tok_ok": true, "tok_s": 10.78, "tok_bytes": 154, "tok_n": 64, "kv_ok": true, "kv_s": 10.51, "kv_bytes": 5981179}
+{"t": 1788517120.577, "event": "compare", "question": "2+3*4 = ?", "tok_ok": true, "tok_s": 10.46, "tok_bytes": 108, "tok_n": 64, "kv_ok": true, "kv_s": 11.04, "kv_bytes": 6210555}

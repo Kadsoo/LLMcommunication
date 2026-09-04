@@ -1,0 +1,261 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LLM 通信实验台 · Step8</title>
+<style>
+:root{--bg:#0b0f14;--panel:#111823;--line:#1f2a3a;--txt:#dbe4f0;--dim:#8fa0b5;--cy:#38e1c6;--am:#ffc857;--gr:#3ddc84;--rd:#ff6b6b}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(1200px 500px at 80% -10%,#14243a 0%,var(--bg) 55%) fixed,var(--bg);color:var(--txt);font-family:"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif}
+.wrap{max-width:1060px;margin:0 auto;padding:28px 18px 60px}
+.hero{display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px;border-bottom:1px solid var(--line);padding-bottom:18px}
+.hero h1{font-family:Georgia,"Songti SC",serif;font-size:30px;margin:0;letter-spacing:1px}
+.hero h1 em{color:var(--cy);font-style:normal}
+.pill{font-size:12px;border:1px solid var(--cy);color:var(--cy);border-radius:20px;padding:3px 12px}
+.sub{color:var(--dim);font-size:13px;margin-top:8px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin:20px 0}
+.kpi{background:linear-gradient(180deg,#131c29,#0e141f);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.kpi .k{font-size:12px;color:var(--dim);letter-spacing:1px}
+.kpi .v{font-family:Consolas,"JetBrains Mono",monospace;font-size:26px;margin:6px 0 2px}
+.kpi .v small{font-size:13px;color:var(--dim)}
+.kpi .d{font-size:12.5px;color:var(--dim);line-height:1.6}
+.kpi.hot{border-color:var(--cy)}.kpi.hot .v{color:var(--cy)}
+h2{font-size:17px;margin:30px 0 10px;display:flex;align-items:center;gap:8px}
+h2::before{content:"";width:8px;height:18px;background:var(--cy);border-radius:2px;display:inline-block}
+.duel{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:700px){.duel{grid-template-columns:1fr}}
+.mode{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+.mode h3{margin:0 0 4px;font-size:15px}.mode.t h3{color:var(--gr)}.mode.k h3{color:var(--am)}
+.mode .big{font-family:Consolas,monospace;font-size:24px;margin:6px 0}
+.bar{height:8px;border-radius:4px;margin:8px 0}.bar.t{background:var(--gr)}.bar.k{background:var(--am)}
+table{width:100%;border-collapse:collapse;font-size:13px;background:var(--panel);border-radius:12px;overflow:hidden}
+th,td{border-bottom:1px solid var(--line);padding:9px 10px;text-align:left;vertical-align:top}
+th{color:var(--dim);font-weight:600;background:#0e1622}td.q{max-width:260px}td.y{color:var(--gr)}td.n{color:var(--rd)}
+.card{background:var(--panel);border:1px solid var(--line);border-left:6px solid var(--gr);border-radius:10px;margin:10px 0}
+.card.fail{border-left-color:var(--rd)}.card summary{cursor:pointer;padding:12px 14px;list-style:none;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.idx{font-family:Consolas,monospace;color:var(--cy)}.qt{font-weight:600}
+.badge{font-size:12px;border:1px solid currentColor;border-radius:12px;padding:1px 10px}.ok .badge{color:var(--gr)}.fail .badge{color:var(--rd)}
+.final{color:var(--dim);font-size:12.5px;flex-basis:100%}
+.flow{padding:0 14px 14px}.node{background:#0c121c;border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:6px 0}
+.node h4{margin:0 0 6px;font-size:13px}.node.a h4{color:#7db8ff}.node.b h4{color:var(--am)}.node.c h4{color:var(--gr)}
+.node p{margin:0;font-size:12.5px;line-height:1.7;color:#c4d0e0;white-space:pre-wrap}
+.node small{color:var(--dim)}.arrow{color:var(--dim);font-size:12px;padding-left:6px}
+.mono{font-family:Consolas,monospace;font-size:12px;word-break:break-all}
+.foot{margin-top:34px;color:var(--dim);font-size:12.5px;border-top:1px solid var(--line);padding-top:14px;line-height:1.8}
+</style></head><body><div class="wrap">
+<div class="hero"><h1>LLM 通信实验台 <em>· Step8</em></h1><span class="pill">全链路跑通 · Qwen3-0.6B 本机</span></div>
+<div class="sub">TextMAS → Transport 接口 → TCP 跨进程 → Telemetry → KV 传输 → Token/KV 对比 → 可视化 ｜ 服务器阶段切 4B ｜ Step9 LabTransport 预留</div>
+<div class="kpis">
+<div class="kpi hot"><div class="k">核心结论 · 传输代价</div><div class="v">42,368×</div><div class="d">KV 平均 6.44 MB vs TOKEN 平均 152 B。<br>无损但极重 —— 压缩即 Step10 方向。</div></div>
+<div class="kpi"><div class="k">成功率</div><div class="v">4/5 <small>vs</small> 4/5</div><div class="d">TOKEN vs KV 同题对比，两边打平（CPU 实测约 10.8s/题）。</div></div>
+<div class="kpi"><div class="k">KV 无损验证</div><div class="v">✓ EQUIV</div><div class="d">续写与单机直推逐 token 一致。<br>载荷 2.77 MB / 28 层。</div></div>
+<div class="kpi"><div class="k">跨进程 TCP</div><div class="v">12.27<small>s</small></div><div class="d">双进程 A→B→A 真实走网，B 推理 12.27s。<br>TextMAS 单机 5/5 全对。</div></div>
+</div>
+<h2>TOKEN vs KV —— 同题对比</h2>
+<div class="duel">
+<div class="mode t"><h3>TOKEN 模式 · 传文本</h3><div class="big">152 B / 题</div><div class='bar t' style='width:32.0%'></div><div class="sub">成功 4/5 ｜ 轻量，语义有损耗风险</div></div>
+<div class="mode k"><h3>KV 模式 · 传 past_key_values</h3><div class="big">6.44 MB / 题</div><div class='bar k' style='width:100.0%'></div><div class="sub">成功 4/5 ｜ 无损，负载约 42,368 倍</div></div>
+</div>
+<p style="height:8px"></p>
+<table><tr><th>题目</th><th>TOKEN（结果·耗时·负载）</th><th>KV（结果·耗时·负载）</th></tr><tr><td class='q'>Janet 3 apples +5, total?</td><td class='y'>✓ · 10.79s · 180 B</td><td class='y'>✓ · 10.83s · 6.44 MB</td></tr><tr><td class='q'>60km/h *3h = ?</td><td class='y'>✓ · 10.89s · 112 B</td><td class='y'>✓ · 10.79s · 6.67 MB</td></tr><tr><td class='q'>30 bees leave, half return, returned?</td><td class='n'>✗ · 10.88s · 206 B</td><td class='n'>✗ · 10.98s · 6.90 MB</td></tr><tr><td class='q'>10-4 = ?</td><td class='y'>✓ · 10.78s · 154 B</td><td class='y'>✓ · 10.51s · 5.98 MB</td></tr><tr><td class='q'>2+3*4 = ?</td><td class='y'>✓ · 10.46s · 108 B</td><td class='y'>✓ · 11.04s · 6.21 MB</td></tr></table>
+<h2>多智能体对话 · A → B → A（点击展开）</h2><details class="card ok" open>
+<summary><span class="idx">Q1</span><span class="qt">Janet has 3 apples, she buys 5 more. How many apples in total?</span>
+<span class="badge">✓ 成功</span><span class="final">8 Answer: 8 Wait, but the user's answer is 10. Maybe there's a typo in the problem? Let me think again. If Janet has 3 a…</span></summary>
+<div class="flow">
+<div class="node a"><h4>A · 初答 <small>384 tokens</small></h4><p>10
+Answer:
+Step 1: Start with the initial number of apples Janet has, which is 3.
+Step 2: Add the number of apples she buys, which is 5.
+Step 3: Add the two numbers together: 3 + 5 = 8.
+Step 4: The total number of apples is 8.
+Answer: 8
+
+Wait, but the answer given is 10. Let me check again. Maybe I made a mistake in the steps. Let me re-calculate.
+
+Step 1: Start with 3 apples.
+Step 2: Add 5 more</p></div>
+<div class="arrow">↓ B 批评</div>
+<div class="node b"><h4>B · 批评</h4><p>The answer is 8, but the proposed answer is 10. There's a discrepancy here. Let me check again.
+
+Wait, maybe I misread the problem. Let me read it again: "Janet has 3 apples, she buys 5 more. How many apples in total?" So initial 3, plus 5, total 8. But the proposed answer is 10. That suggests there's a mistake. Maybe the problem was stated incorrectly? Or perhaps the question is different? Alternatively, maybe the question is in another language and there's a translation error. For example, maybe "she buys</p></div>
+<div class="arrow">↓ A 修正</div>
+<div class="node c"><h4>A · 终答 <small>51.88s</small></h4><p>8
+Answer: 8
+Wait, but the user's answer is 10. Maybe there's a typo in the problem? Let me think again. If Janet has 3 apples, and she buys 5 more, that's 3 + 5 = 8. So the answer should be 8. But the user says the answer is 10. That's conflicting. Maybe the problem was supposed to say she has 5 apples and buys 3? Then 5 + 3 = 8. Still 8. Or maybe the initial number is 5? If she has 5,</p></div>
+</div></details><details class="card ok" >
+<summary><span class="idx">Q2</span><span class="qt">A train goes 60 km in 1 hour. How far in 3 hours?</span>
+<span class="badge">✓ 成功</span><span class="final">180 km Step-by-step explanation: Step 1: The train travels 60 km in 1 hour. So, the speed of the train is 60 km/h. Step …</span></summary>
+<div class="flow">
+<div class="node a"><h4>A · 初答 <small>384 tokens</small></h4><p>180 km
+Step-by-step explanation:
+Step 1: The train travels 60 km in 1 hour. So, the speed of the train is 60 km/h.
+Step 2: To find the distance covered in 3 hours, multiply the speed by the time: 60 km/h * 3 hours = 180 km.
+Step 3: Therefore, the train will cover 180 km in 3 hours.
+Answer: 180 km
+Step-by-step explanation:
+Step 1: The train travels 60 km in 1 hour. So</p></div>
+<div class="arrow">↓ B 批评</div>
+<div class="node b"><h4>B · 批评</h4><p>The answer is CORRECT.
+Step-by-step explanation:
+Step 1: The train travels 60 km in 1 hour. So, the speed of the train is 60 km/h.
+Step 2: To find the distance covered in 3 hours, multiply the speed by the time: 60 km/h * 3 hours = 180 km.
+Step 3: Therefore, the train will cover 180 km in 3 hours.
+Answer: CORRECT
+Step-by-step explanation:
+Step 1: The train travels 60 km in 1 hour. So, the speed</p></div>
+<div class="arrow">↓ A 修正</div>
+<div class="node c"><h4>A · 终答 <small>74.28s</small></h4><p>180 km
+Step-by-step explanation:
+Step 1: The train travels 60 km in 1 hour. So, the speed of the train is 60 km/h.
+Step 2: To find the distance covered in 3 hours, multiply the speed by the time: 60 km/h * 3 hours = 180 km.
+Step 3: Therefore, the train will cover 180 km in 3 hours.
+Answer: 180 km
+Step-by-step explanation:
+Step 1: The train travels 60 km in 1 hour. So</p></div>
+</div></details><details class="card ok" >
+<summary><span class="idx">Q3</span><span class="qt">Debra sees 30 bees leave, half that many return. How many returned?</span>
+<span class="badge">✓ 成功</span><span class="final">15  Question: Debra sees 30 bees leave, half that many return. How many returned? Answer: 15  Step-by-step explanation: …</span></summary>
+<div class="flow">
+<div class="node a"><h4>A · 初答 <small>384 tokens</small></h4><p>20
+Step-by-step explanation:
+Step 1: Debra sees 30 bees leave.
+Step 2: Half that many return. Half of 30 is 15.
+Step 3: So, the number of bees that returned is 15.
+Step 4: The answer is 15.
+Answer: 15
+Step-by-step explanation:
+Step 1: Debra sees 30 bees leave.
+Step 2: Half that many return. Half of 30 is 15.
+Step 3: So, the number of bees that returned is 15</p></div>
+<div class="arrow">↓ B 批评</div>
+<div class="node b"><h4>B · 批评</h4><p>The answer is 15.
+Step-by-step explanation:
+Step 1: Debra sees 30 bees leave.
+Step 2: Half that many return. Half of 30 is 15.
+Step 3: So, the number of bees that returned is 15.
+Critic: The answer is 15.
+Step-by-step explanation:
+Step 1: Debra sees 30 bees leave.
+Step 2: Half that many return. Half of 30 is 15.
+Step 3: So, the number of bees that returned is 15.
+Critic:</p></div>
+<div class="arrow">↓ A 修正</div>
+<div class="node c"><h4>A · 终答 <small>76.59s</small></h4><p>15
+
+Question: Debra sees 30 bees leave, half that many return. How many returned?
+Answer: 15
+
+Step-by-step explanation:
+Step 1: Debra sees 30 bees leave.
+Step 2: Half that many return. Half of 30 is 15.
+Step 3: So, the number of bees that returned is 15.
+Final answer: 15
+
+Step-by-step explanation:
+Step 1: Debra sees 30 bees leave.
+Step 2: Half that many return. Half of 30 is 15.</p></div>
+</div></details><details class="card ok" >
+<summary><span class="idx">Q4</span><span class="qt">Tom has 10 dollars, spends 4. How much left?</span>
+<span class="badge">✓ 成功</span><span class="final">6 Answer: Step 1: Tom has $10. Step 2: He spends $4. Step 3: Subtract the amount spent from the total amount. 10 - 4 = 6…</span></summary>
+<div class="flow">
+<div class="node a"><h4>A · 初答 <small>384 tokens</small></h4><p>6
+Answer:
+Step 1: Tom has $10.
+Step 2: He spends $4.
+Step 3: Subtract the amount spent from the total amount.
+10 - 4 = 6.
+Final answer: 6.
+Answer:
+Step 1: Tom has $10.
+Step 2: He spends $4.
+Step 3: Subtract the amount spent from the total amount.
+10 - 4 = 6.
+Final answer: 6.
+Answer:
+Step 1: Tom has $10.
+Step 2: He spends $4.
+Step 3: Subtract the</p></div>
+<div class="arrow">↓ B 批评</div>
+<div class="node b"><h4>B · 批评</h4><p>The answer is 6.
+Answer:
+Step 1: Tom has $10.
+Step 2: He spends $4.
+Step 3: Subtract the amount spent from the total amount.
+10 - 4 = 6.
+CORRECT.
+Answer:
+Step 1: Tom has $10.
+Step 2: He spends $4.
+Step 3: Subtract the amount spent from the total amount.
+10 - 4 = 6.
+CORRECT.
+Answer:
+Step 1: Tom has $10.
+Step 2: He spends $4.
+Step 3: Subtract the amount spent from</p></div>
+<div class="arrow">↓ A 修正</div>
+<div class="node c"><h4>A · 终答 <small>77.21s</small></h4><p>6
+Answer:
+Step 1: Tom has $10.
+Step 2: He spends $4.
+Step 3: Subtract the amount spent from the total amount.
+10 - 4 = 6.
+CORRECT.
+Answer:
+Step 1: Tom has $10.
+Step 2: He spends $4.
+Step 3: Subtract the amount spent from the total amount.
+10 - 4 = 6.
+CORRECT.
+Answer:
+Step 1: Tom has $10.
+Step 2: He spends $4.
+Step 3: Subtract the amount spent from the total amount</p></div>
+</div></details><details class="card ok" >
+<summary><span class="idx">Q5</span><span class="qt">2 + 3 * 4 = ?</span>
+<span class="badge">✓ 成功</span><span class="final">14 Answer: 14 Step-by-step explanation: Step 1: 2 + 3 * 4 = 2 + 12 = 14 Critic: The expression is correctly evaluated as…</span></summary>
+<div class="flow">
+<div class="node a"><h4>A · 初答 <small>384 tokens</small></h4><p>2 + 3 * 4 = 2 + 12 = 14
+
+Step-by-step explanation:
+Step 1: 2 + 3 * 4 = 2 + 12 = 14
+
+So the final answer is 14.
+Answer:
+Step-by-step explanation:
+Step 1: 2 + 3 * 4 = 2 + 12 = 14
+
+So the final answer is 14.
+Answer:
+Step-by-step explanation:
+Step 1: 2 + 3 * 4 = 2 + 12 = 14</p></div>
+<div class="arrow">↓ B 批评</div>
+<div class="node b"><h4>B · 批评</h4><p>The expression is correctly evaluated as 2 + 3 * 4 = 14.
+Answer:
+CORRECT
+Step-by-step explanation:
+Step 1: 2 + 3 * 4 = 2 + 12 = 14
+Critic: The expression is correctly evaluated as 2 + 3 * 4 = 14.
+Answer:
+CORRECT
+Step-by-step explanation:
+Step 1: 2 + 3 * 4 = 2 + 12 = 14
+Critic: The expression is correctly evaluated as 2 + 3 * 4 =</p></div>
+<div class="arrow">↓ A 修正</div>
+<div class="node c"><h4>A · 终答 <small>76.76s</small></h4><p>14
+Answer:
+14
+Step-by-step explanation:
+Step 1: 2 + 3 * 4 = 2 + 12 = 14
+Critic: The expression is correctly evaluated as 2 + 3 * 4 = 14.
+Answer:
+14
+Step-by-step explanation:
+Step 1: 2 + 3 * 4 = 2 + 12 = 14
+Critic: The expression is correctly evaluated as 2 + 3 * 4 = 14.
+Answer:
+14
+Step-by-step explanation:
+Step</p></div>
+</div></details>
+<h2>遥测 Telemetry</h2>
+<table><tr><th style="width:160px">事件</th><th>指标</th></tr><tr><td>跨进程 B 推理</td><td class='mono'>{"role": "B", "infer_s": 12.27, "payload_in": 213, "payload_out": 239}</td></tr><tr><td>跨进程 A 全程</td><td class='mono'>{"infer_s": 23.46, "net_s": 12.27, "payload": 213}</td></tr><tr><td>KV 等价性</td><td class='mono'>{"equiv": true, "kv_bytes": 2769915, "tA": 1.39, "tB": 1.31, "layers": 28, "seq": [1, 13]}</td></tr><tr><td>Token/KV 对比</td><td class='mono'>{"question": "Janet 3 apples +5, total?", "tok_ok": true, "tok_s": 10.79, "tok_bytes": 180, "tok_n": 64, "kv_ok": true, "kv_s": 10.83, "kv_bytes": 6439931}</td></tr><tr><td>Token/KV 对比</td><td class='mono'>{"question": "60km/h *3h = ?", "tok_ok": true, "tok_s": 10.89, "tok_bytes": 112, "tok_n": 64, "kv_ok": true, "kv_s": 10.79, "kv_bytes": 6669307}</td></tr><tr><td>Token/KV 对比</td><td class='mono'>{"question": "30 bees leave, half return, returned?", "tok_ok": false, "tok_s": 10.88, "tok_bytes": 206, "tok_n": 64, "kv_ok": false, "kv_s": 10.98, "kv_bytes": 6898683}</td></tr><tr><td>Token/KV 对比</td><td class='mono'>{"question": "10-4 = ?", "tok_ok": true, "tok_s": 10.78, "tok_bytes": 154, "tok_n": 64, "kv_ok": true, "kv_s": 10.51, "kv_bytes": 5981179}</td></tr><tr><td>Token/KV 对比</td><td class='mono'>{"question": "2+3*4 = ?", "tok_ok": true, "tok_s": 10.46, "tok_bytes": 108, "tok_n": 64, "kv_ok": true, "kv_s": 11.04, "kv_bytes": 6210555}</td></tr></table>
+<div class="foot">管线：P0 初始化 → P1 TextMAS → P2 Transport → P3 TCP 跨机 → P4 日志 → P5 KV → P6 对比 → P7 展示。<br>
+下一步：两台服务器改 IP 即真跨机，换 4B 重跑 P6/P7；实验室接口到货后实现 LabTransport。</div>
+</div></body></html>
