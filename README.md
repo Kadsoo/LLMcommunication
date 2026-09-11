@@ -21,8 +21,16 @@ python eval/mixed_check.py     # 混合模式 5 题一致性验证
 python transport/discuss.py --role b
 python transport/discuss.py --role a --task math --n 5
 python demo/build_report.py    # 生成静态报告 demo/index.html
-python demo/app.py             # 交互工作台 http://127.0.0.1:7860
+python demo/app.py             # 实时工作台 http://127.0.0.1:7860（控制面板一键讨论）
 ```
+
+## 实时工作台（`demo/app.py`）
+
+- 控制面板：角色（单机一键AB / 本机A / 本机B）+ 对方IP + 端口 + 任务 + 题数 + 开始/停止
+- 单机：选 single 点开始，自动起 B 再起 A，全程无命令行
+- 跨机：A 机填 B 机IP点开始；B 机选"等待连接"点开始；两边各自实时看本地时间线
+- 时间线每 2s 轮询本地 telemetry 逐轮弹出（TOKEN/KV 徽章 + 时延 + 负载 + ✓/✗）
+- 对端要求：同一局域网，都已 clone + 装好环境 + 下好同一模型，transformers 同版本，防火墙放行讨论端口
 
 拓扑配置见 `config.yaml`：1+1（默认，B 机单个 critic）或 1+N
 （B 机 `agents: ["critic", "verifier"]` 接力）。

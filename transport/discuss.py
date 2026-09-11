@@ -61,13 +61,21 @@ def judge(task, item, a2):
     return ok
 
 def run_b(tp, agents=("critic",)):
+    qid = -1
     while True:
-        mtype, data, meta = recv_payload(tp, timeout=600)
+        try:
+            mtype, data, meta = recv_payload(tp, timeout=60)
+        except Exception:
+            continue  # 等待对端中; 工作台停止按钮直接杀进程
         if meta.get("task") == "END":
             print("B: discussion ended.", flush=True); break
         assert mtype == "TOKEN"
         task, q, a1, rnd = meta["task"], meta["question"], data.decode("utf-8"), meta["round"]
         grid = meta.get("grid", "")
+        if rnd == 1:
+            qid += 1
+        log("discuss_b_msg", task=task, qid=qid, round=rnd, question=q, proposal=a1,
+            grid=grid if task == "maze" else "")
         text, kv, seq, dt_total = "", None, None, 0.0
         prev = a1
         chain = []
@@ -81,7 +89,8 @@ def run_b(tp, agents=("critic",)):
         raw = serialize_kv(kv)
         send_kv(tp, raw, hop="B->A", mode="KV", n_bytes=len(raw), ids=seq.tolist(),
                 infer_s=round(dt_total, 2), round=rnd, chain="+".join(chain))
-        log("discuss_b", task=task, round=rnd, infer_s=round(dt_total, 2), kv_bytes=len(raw), chain="+".join(chain))
+        log("discuss_b", task=task, qid=qid, round=rnd, infer_s=round(dt_total, 2),
+            kv_bytes=len(raw), chain="+".join(chain), critic=text)
         print(f"B: round{rnd} chain={'+'.join(chain)} replied ({len(raw)}B KV).", flush=True)
 
 def run_a(tp, task, n):
@@ -114,7 +123,8 @@ def run_a(tp, task, n):
             ok = judge(task, item, a2)
             rounds_used += 1
             log("discuss_a", task=task, qid=qi, round=rnd, ok=ok, net_s=net,
-                kv_bytes=meta.get("n_bytes", 0), infer_s=round(t1 + t2, 2) if rnd == 1 else round(t2, 2))
+                kv_bytes=meta.get("n_bytes", 0), infer_s=round(t1 + t2, 2) if rnd == 1 else round(t2, 2),
+                question=q, proposal=proposal, critic=critic, final=a2)
             print(f"A: q{qi} round{rnd} ok={ok} net={net}s kv={meta.get('n_bytes',0)}B", flush=True)
             if ok: break
             proposal = a2
@@ -142,20 +152,23 @@ def main():
     MAX_ROUNDS = cfg["discuss"].get("max_rounds", 2)
     agents = tuple(cfg["b"].get("agents", ["critic"]))
     load_model()
-    if args.role == "b":
-        print(f"B listening... agents={'+'.join(agents)}", flush=True)
-        tp = TcpTransport(host=host, port=port, is_server=True)
-        run_b(tp, agents)
-    else:
-        tp = None
-        for i in range(30):
-            try:
-                tp = TcpTransport(host=host, port=port, is_server=False); break
-            except ConnectionRefusedError:
-                print(f"wait server...{i}", flush=True); time.sleep(10)
-        if tp is None: raise ConnectionError("server not ready")
-        run_a(tp, task, n)
-    tp.close()
+    tp = None
+    try:
+        if args.role == "b":
+            print(f"B listening... agents={'+'.join(agents)}", flush=True)
+            tp = TcpTransport(host=host, port=port, is_server=True)
+            run_b(tp, agents)
+        else:
+            for i in range(30):
+                try:
+                    tp = TcpTransport(host=host, port=port, is_server=False); break
+                except ConnectionRefusedError:
+                    print(f"wait server...{i}", flush=True); time.sleep(10)
+            if tp is None: raise ConnectionError("server not ready")
+            run_a(tp, task, n)
+    finally:
+        if tp is not None:
+            tp.close()
 
 if __name__ == "__main__":
     main()
