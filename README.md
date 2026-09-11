@@ -17,31 +17,19 @@ python agents/run_textmas.py   # 单机 TextMAS（A解答→B批评→A修正）
 python eval/kv_equiv.py        # KV 捕获→传输→恢复，等价性验证
 python eval/compare.py         # 50 题 TOKEN vs KV 对比（CPU 约 30 分钟）
 python eval/mixed_check.py     # 混合模式 5 题一致性验证
-# 跨机讨论（先 B 后 A；服务器上改 config.yaml 里 B 机 IP）:
-python transport/discuss.py --role b
-python transport/discuss.py --role a --task math --n 5
 python demo/build_report.py    # 生成静态报告 demo/index.html
-python demo/app.py             # 实时工作台 http://127.0.0.1:7860（控制面板一键讨论）
+python demo/app.py             # 交互工作台 http://127.0.0.1:7860
 ```
 
-## 实时工作台（`demo/app.py`）
-
-- 控制面板：角色（单机一键AB / 本机A / 本机B）+ 对方IP + 端口 + 任务 + 题数 + 开始/停止
-- 单机：选 single 点开始，自动起 B 再起 A，全程无命令行
-- 跨机：A 机填 B 机IP点开始；B 机选"等待连接"点开始；两边各自实时看本地时间线
-- 时间线每 2s 轮询本地 telemetry 逐轮弹出（TOKEN/KV 徽章 + 时延 + 负载 + ✓/✗）
-- 对端要求：同一局域网，都已 clone + 装好环境 + 下好同一模型，transformers 同版本，防火墙放行讨论端口
-
-拓扑配置见 `config.yaml`：1+1（默认，B 机单个 critic）或 1+N
-（B 机 `agents: ["critic", "verifier"]` 接力）。
+> 说明：跨机讨论（TCP/IP）已撤回——实验室采用实验设备通信而非网络，
+> 待设备接口文档到位后以新 Transport 实现对接（Step9）。
 
 ## 目录结构
 
 ```
 agents/        run_textmas.py（单机 TextMAS）+ 结果 jsonl
 transport/     adapter.py（Transport 接口：Local/TCP/Lab 预留）
-               server_b.py / client_a.py（双进程 TCP 跨机对话）
-               discuss.py（跨机讨论器：混合模式 + 成功率指标）
+               server_b.py / client_a.py（双进程 TCP 本地联调演示）
                link.py（TOKEN/KV 收发助手）
 telemetry/     logger.py + runs.jsonl（推理/传输/负载统一日志）
 eval/          dataset.py（数学 50 题：自编 30 + GSM8K 20）
@@ -52,7 +40,6 @@ eval/          dataset.py（数学 50 题：自编 30 + GSM8K 20）
                kv_equiv.py / delta_kv.py（KV 等价性 / Delta KV 原型）
 demo/          build_report.py（静态报告）/ app.py（Gradio 工作台）
 docs/          服务器部署清单.md / 实验室对接需求.md
-config.yaml    讨论拓扑配置（1+1 / 1+N）
 ```
 
 ## 实验流程（对应 steps.md）
@@ -85,9 +72,8 @@ config.yaml    讨论拓扑配置（1+1 / 1+N）
 Delta KV（Step10）：只传新增位置的 KV，压缩比随 prompt 长度 3.1x→50x，
 5 档长度等价性全部通过（`eval/delta_kv_table.md`）。
 
-混合模式（助教要求：A 传 TOKEN / B 传 KV）：`eval/mixed_check.py` 5 题与纯文本
-管线逐题一致；`transport/discuss.py` 跨机多轮讨论数学 3/5（迷宫 0/5，
-0.6B 空间推理不足，待 4B）。
+混合模式（A 传 TOKEN / B 传 KV）：`eval/mixed_check.py` 5 题与纯文本
+管线逐题一致（传输层无关实现，设备对接后复用同一协议）。
 
 走迷宫第二任务：`eval/maze.py` 20 道（5x5/7x7，BFS 最短路为参考，路径合法性
 自动判定），Demo 页渲染迷宫图 + 参考路径。

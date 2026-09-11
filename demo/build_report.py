@@ -23,12 +23,6 @@ runs = load_jsonl(ROOT / "telemetry" / "runs.jsonl")
 cmps = [r for r in runs if r.get("event") == "compare"][-50:]
 kv_eq = next((r for r in runs if r.get("event") == "kv_equiv"), {})
 tcp_a = next((r for r in runs if r.get("event") == "tcp_a"), {})
-discuss_a = [r for r in runs if r.get("event") == "discuss_a"]
-_latest = {}
-for s in runs:
-    if s.get("event") == "discuss_summary":
-        _latest[s.get("task")] = s
-discuss_sum = list(_latest.values())
 
 # ---- 汇总 ----
 tok_ok = sum(1 for r in cmps if r.get("tok_strict")); kv_ok = sum(1 for r in cmps if r.get("kv_strict"))
@@ -42,26 +36,6 @@ kv_bytes_eq = kv_eq.get("kv_bytes", 0)
 kv_layers = kv_eq.get("layers", "?")
 net_s = tcp_a.get("net_s", "?")
 tm_ok = sum(1 for r in textmas if r.get("correct")); tm_n = len(textmas)
-
-# ---- 跨机讨论面板 ----
-def discuss_block():
-    if not discuss_sum:
-        return "<p style='color:var(--dim)'>暂无跨机讨论数据（运行 transport/discuss.py 后生成）。</p>"
-    cards = ""
-    for s in discuss_sum:
-        cards += (f"<div class='mode t'><h3>{'数学' if s.get('task')=='math' else '迷宫'} · 跨机讨论</h3>"
-                  f"<div class='big'>{s.get('wins')}/{s.get('total')} 成功</div>"
-                  f"<div class='sub'>共 {s.get('rounds')} 轮次 · A→B <span class='mtok'>TOKEN</span> B→A <span class='mkv'>KV</span></div></div>")
-    rows = ""
-    for r in discuss_a[-20:]:
-        ok = "✓" if r.get("ok") else "✗"; cls = "y" if r.get("ok") else "n"
-        rows += (f"<tr><td>{'数学' if r.get('task')=='math' else '迷宫'} Q{r.get('qid')}</td>"
-                 f"<td>第{r.get('round')}轮</td><td class='{cls}'>{ok}</td>"
-                 f"<td><span class='mtok'>TOKEN</span>→<span class='mkv'>KV</span></td>"
-                 f"<td>{r.get('net_s','?')}s</td><td>{fmt_bytes(r.get('kv_bytes',0))}</td></tr>")
-    return (f"<div class='duel'>{cards}</div><p style='height:8px'></p>"
-            f"<table><tr><th>题目</th><th>轮次</th><th>结果</th><th>通信模式</th><th>网络耗时</th><th>KV负载</th></tr>{rows}</table>")
-DISCUSS_HTML = discuss_block()
 
 # ---- 迷宫渲染 ----
 def maze_html(m):
@@ -195,8 +169,6 @@ td.mz.s{{background:var(--gr)}}td.mz.e{{background:var(--rd)}}
 <div class="k"><div class="k">KV · 严格通过</div><div class="v">{kv_ok}/{len(cmps)} <small>({kv_ok/len(cmps)*100:.0f}%)</small></div><div class="d">端到端 {ak:.1f}s/题 · 宽松 {l_k}/{len(cmps)}</div></div>
 </div>
 <div class="note"><b>关键验证：</b>修正 KV 模式停止策略（与 TOKEN 同为生成到 EOS）后，两模式 50 题逐题结果完全一致（严格/宽松均同）—— 证明 KV 传输无损、与直推等价；0.6B 正确率 44% 是模型能力上限（GSM8K 3/20），非流程缺陷。</div>
-
-<h2>跨机讨论 · 混合模式（A→B TOKEN / B→A KV）</h2>{DISCUSS_HTML}
 
 <h2>走迷宫题集示例（青色=参考最短路）</h2><div class="mazes">{MAZE_HTML}</div>
 
