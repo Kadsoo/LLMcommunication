@@ -1,7 +1,9 @@
 """Step8: 生成简洁实验仪表盘 (Tab分区 / 对话完整 / 重点突出)."""
-import json, math
+import json, math, sys
 from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from eval.maze import load_mazes, bfs_path, find, MOVES
 
 def load_jsonl(p):
     if not p.exists(): return []
@@ -21,6 +23,12 @@ runs = load_jsonl(ROOT / "telemetry" / "runs.jsonl")
 cmps = [r for r in runs if r.get("event") == "compare"][-50:]
 kv_eq = next((r for r in runs if r.get("event") == "kv_equiv"), {})
 tcp_a = next((r for r in runs if r.get("event") == "tcp_a"), {})
+discuss_a = [r for r in runs if r.get("event") == "discuss_a"]
+_latest = {}
+for s in runs:
+    if s.get("event") == "discuss_summary":
+        _latest[s.get("task")] = s
+discuss_sum = list(_latest.values())
 
 # ---- 汇总 ----
 tok_ok = sum(1 for r in cmps if r.get("tok_strict")); kv_ok = sum(1 for r in cmps if r.get("kv_strict"))
@@ -35,7 +43,47 @@ kv_layers = kv_eq.get("layers", "?")
 net_s = tcp_a.get("net_s", "?")
 tm_ok = sum(1 for r in textmas if r.get("correct")); tm_n = len(textmas)
 
-# ---- 分题型汇总 ----
+# ---- 跨机讨论面板 ----
+def discuss_block():
+    if not discuss_sum:
+        return "<p style='color:var(--dim)'>暂无跨机讨论数据（运行 transport/discuss.py 后生成）。</p>"
+    cards = ""
+    for s in discuss_sum:
+        cards += (f"<div class='mode t'><h3>{'数学' if s.get('task')=='math' else '迷宫'} · 跨机讨论</h3>"
+                  f"<div class='big'>{s.get('wins')}/{s.get('total')} 成功</div>"
+                  f"<div class='sub'>共 {s.get('rounds')} 轮次 · A→B <span class='mtok'>TOKEN</span> B→A <span class='mkv'>KV</span></div></div>")
+    rows = ""
+    for r in discuss_a[-20:]:
+        ok = "✓" if r.get("ok") else "✗"; cls = "y" if r.get("ok") else "n"
+        rows += (f"<tr><td>{'数学' if r.get('task')=='math' else '迷宫'} Q{r.get('qid')}</td>"
+                 f"<td>第{r.get('round')}轮</td><td class='{cls}'>{ok}</td>"
+                 f"<td><span class='mtok'>TOKEN</span>→<span class='mkv'>KV</span></td>"
+                 f"<td>{r.get('net_s','?')}s</td><td>{fmt_bytes(r.get('kv_bytes',0))}</td></tr>")
+    return (f"<div class='duel'>{cards}</div><p style='height:8px'></p>"
+            f"<table><tr><th>题目</th><th>轮次</th><th>结果</th><th>通信模式</th><th>网络耗时</th><th>KV负载</th></tr>{rows}</table>")
+DISCUSS_HTML = discuss_block()
+
+# ---- 迷宫渲染 ----
+def maze_html(m):
+    g = [list(row) for row in m["grid"].split("\n")]
+    ref = bfs_path(g)
+    cells = set(); cur = find(g, "S")
+    for ch in (ref or ""):
+        dr, dc = MOVES[ch]; cur = (cur[0] + dr, cur[1] + dc); cells.add(cur)
+    tds = ""
+    for r, row in enumerate(g):
+        tds += "<tr>"
+        for c, v in enumerate(row):
+            if v == "#": cls = "w"
+            elif v == "S": cls = "s"
+            elif v == "E": cls = "e"
+            elif (r, c) in cells: cls = "p"
+            else: cls = "o"
+            tds += f"<td class='mz {cls}'></td>"
+        tds += "</tr>"
+    return (f"<div class='mazebox'><b>{m['id']}</b> · {m['size']}×{m['size']} · 参考最短 {m['ref_len']} 步"
+            f"<table class='maze'>{tds}</table></div>")
+MAZE_HTML = "".join(maze_html(m) for m in load_mazes()[:4])
 cats = ["arithmetic", "word_problem", "ratio", "logic", "units", "gsm8k"]
 cat_name = {"arithmetic": "算术", "word_problem": "应用题", "ratio": "比例", "logic": "逻辑", "units": "单位换算", "gsm8k": "GSM8K"}
 cat_rows = ""
@@ -128,6 +176,14 @@ td.mono{{font-family:Consolas,monospace}}
 .node p{{margin:0;font-size:12.5px;line-height:1.75;color:#c4d0e0;white-space:pre-wrap}}
 .node small{{color:var(--dim)}}
 .arrow{{color:var(--dim);font-size:12px;padding-left:6px}}
+.mtok,.mkv{{font-size:11px;border-radius:10px;padding:1px 9px;border:1px solid currentColor;white-space:nowrap}}
+.mtok{{color:var(--gr)}}.mkv{{color:var(--am)}}
+.mazes{{display:flex;gap:14px;flex-wrap:wrap}}
+.mazebox{{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:12.5px}}
+table.maze{{border-collapse:collapse;background:transparent}}
+table.maze td.mz{{width:16px;height:16px;padding:0;border:1px solid #263449}}
+td.mz.w{{background:#0a0e14}}td.mz.o{{background:#1b2740}}td.mz.p{{background:var(--cy)}}
+td.mz.s{{background:var(--gr)}}td.mz.e{{background:var(--rd)}}
 .foot{{margin-top:32px;color:var(--dim);font-size:12.5px;border-top:1px solid var(--line);padding-top:14px;line-height:1.8}}
 </style></head><body><div class="wrap">
 
@@ -139,6 +195,10 @@ td.mono{{font-family:Consolas,monospace}}
 <div class="k"><div class="k">KV · 严格通过</div><div class="v">{kv_ok}/{len(cmps)} <small>({kv_ok/len(cmps)*100:.0f}%)</small></div><div class="d">端到端 {ak:.1f}s/题 · 宽松 {l_k}/{len(cmps)}</div></div>
 </div>
 <div class="note"><b>关键验证：</b>修正 KV 模式停止策略（与 TOKEN 同为生成到 EOS）后，两模式 50 题逐题结果完全一致（严格/宽松均同）—— 证明 KV 传输无损、与直推等价；0.6B 正确率 44% 是模型能力上限（GSM8K 3/20），非流程缺陷。</div>
+
+<h2>跨机讨论 · 混合模式（A→B TOKEN / B→A KV）</h2>{DISCUSS_HTML}
+
+<h2>走迷宫题集示例（青色=参考最短路）</h2><div class="mazes">{MAZE_HTML}</div>
 
 <h2>分题型严格通过率</h2>
 <table class="summary-table"><tr><th style="width:110px">题型</th><th>题数</th><th>TOKEN</th><th>KV</th></tr>{cat_rows}</table>

@@ -29,9 +29,17 @@ def load():
     ak = sum(r.get("kv_bytes", 0) for r in cmps) / max(len(cmps), 1)
     ratio = ak / max(ab, 1)
     tm_ok = sum(1 for r in textmas if r.get("correct"))
+    disc_a = [r for r in runs if r.get("event") == "discuss_a"][-20:]
+    latest_sum = {}
+    for s in runs:
+        if s.get("event") == "discuss_summary":
+            latest_sum[s.get("task")] = s
+    disc_s = list(latest_sum.values())
+    ds_txt = " / ".join(f"{'数学' if s.get('task')=='math' else '迷宫'} {s.get('wins')}/{s.get('total')}" for s in disc_s) or "暂无"
     kpi = (f"<div class='kpi'><div>核心 · 传输代价<br><b>{ratio:,.0f}×</b><br>KV {fmt(ak)} vs TOKEN {fmt(ab)}</div>"
            f"<div>成功率 · 严格<br><b>{tok_ok}/{len(cmps)} vs {kv_ok}/{len(cmps)}</b><br>TOKEN vs KV 同题 逐题一致</div>"
            f"<div>宽松通过<br><b>{l_t}/{len(cmps)} vs {l_k}/{len(cmps)}</b><br>两模式同数</div>"
+           f"<div>跨机讨论<br><b>{ds_txt}</b><br>A→B TOKEN / B→A KV</div>"
            f"<div>KV 无损<br><b>{'✓ EQUIV' if kv.get('equiv') else '?'}</b><br>{fmt(kv.get('kv_bytes', 0))} / {kv.get('layers', '?')}层</div></div>")
     cat_name = {"arithmetic": "算术", "word_problem": "应用题", "ratio": "比例", "logic": "逻辑", "units": "单位换算", "gsm8k": "GSM8K"}
     qrows = [[r.get("question", "")[:90], cat_name.get(r.get("category", ""), r.get("category", "")),
@@ -40,16 +48,21 @@ def load():
               fmt(r.get("kv_bytes", 0))] for r in cmps]
     drows = [[r.get("q", ""), str(r.get("a1", ""))[:200], str(r.get("critic", ""))[:200],
               str(r.get("a2", ""))[:200], "成功" if r.get("correct") else "失败"] for r in textmas]
-    return kpi, qrows, drows
+    grows = [[("数学" if r.get("task") == "math" else "迷宫") + " Q" + str(r.get("qid", "")),
+              "第" + str(r.get("round", "")) + "轮", "✓" if r.get("ok") else "✗",
+              "TOKEN→KV", str(r.get("net_s", "")) + "s", fmt(r.get("kv_bytes", 0))] for r in disc_a]
+    return kpi, qrows, drows, grows
 
 def launch():
     import gradio as gr
-    kpi, qrows, drows = load()
+    kpi, qrows, drows, grows = load()
     with gr.Blocks(title="LLM通信 Step8") as demo:
         gr.Markdown("# LLM 通信实验台 · Step8\nQwen3-0.6B 本机 · 50题 ｜ 服务器阶段切 4B ｜ Step9 LabTransport 预留")
         gr.HTML(kpi)
         gr.Markdown("## TOKEN vs KV 同题对比（最近50题）")
         gr.Dataframe(value=qrows, headers=["题目", "题型", "TOKEN", "耗时s", "负载", "KV", "耗时s", "负载"], wrap=True)
+        gr.Markdown("## 跨机讨论（混合模式：A→B TOKEN / B→A KV）")
+        gr.Dataframe(value=grows, headers=["题目", "轮次", "结果", "通信模式", "网络耗时", "KV负载"], wrap=True)
         gr.Markdown("## 多智能体对话 A→B→A")
         gr.Dataframe(value=drows, headers=["问题", "A初答", "B批评", "A终答", "结果"], wrap=True)
     demo.launch(server_name="0.0.0.0", server_port=7860, css=CSS)
