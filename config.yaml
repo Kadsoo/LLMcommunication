@@ -1,0 +1,12 @@
+# 讨论拓扑配置: 1+1(默认) / 1+N(B机多智能体接力)
+mode: "1+1"          # 改 "1+N" 启用B机多智能体
+a:
+  host: "127.0.0.1"  # 服务器上改为A机IP(本机跑A时不用改)
+b:
+  host: "127.0.0.1"  # 服务器上改为B机IP
+  port: 5102
+  agents: ["critic"] # 1+N 示例: ["critic", "verifier"]
+discuss:
+  task: "math"       # math | maze
+  n: 5
+  max_rounds: 2

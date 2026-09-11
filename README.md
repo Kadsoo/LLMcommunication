@@ -11,14 +11,21 @@
 ```bash
 git clone https://github.com/Kadsoo/LLMcommunication.git
 cd LLMcommunication
-pip install torch transformers accelerate safetensors pyarrow gradio
+pip install torch transformers accelerate safetensors pyarrow gradio pyyaml
 
-python agents/run_textmas.py   # P1: 单机 TextMAS（A解答→B批评→A修正）
-python eval/kv_equiv.py        # P5: KV 捕获→传输→恢复，等价性验证
-python eval/compare.py         # P6: 50 题 TOKEN vs KV 对比（CPU 约 30 分钟）
+python agents/run_textmas.py   # 单机 TextMAS（A解答→B批评→A修正）
+python eval/kv_equiv.py        # KV 捕获→传输→恢复，等价性验证
+python eval/compare.py         # 50 题 TOKEN vs KV 对比（CPU 约 30 分钟）
+python eval/mixed_check.py     # 混合模式 5 题一致性验证
+# 跨机讨论（先 B 后 A；服务器上改 config.yaml 里 B 机 IP）:
+python transport/discuss.py --role b
+python transport/discuss.py --role a --task math --n 5
 python demo/build_report.py    # 生成静态报告 demo/index.html
 python demo/app.py             # 交互工作台 http://127.0.0.1:7860
 ```
+
+拓扑配置见 `config.yaml`：1+1（默认，B 机单个 critic）或 1+N
+（B 机 `agents: ["critic", "verifier"]` 接力）。
 
 ## 目录结构
 
@@ -26,13 +33,18 @@ python demo/app.py             # 交互工作台 http://127.0.0.1:7860
 agents/        run_textmas.py（单机 TextMAS）+ 结果 jsonl
 transport/     adapter.py（Transport 接口：Local/TCP/Lab 预留）
                server_b.py / client_a.py（双进程 TCP 跨机对话）
+               discuss.py（跨机讨论器：混合模式 + 成功率指标）
+               link.py（TOKEN/KV 收发助手）
 telemetry/     logger.py + runs.jsonl（推理/传输/负载统一日志）
-eval/          dataset.py（50 题：自编 30 + GSM8K 20）
+eval/          dataset.py（数学 50 题：自编 30 + GSM8K 20）
+               maze.py（走迷宫 20 道：5x5/7x7 + BFS 参考 + 路径判定）
                check_answer.py（严格/宽松数字判定 + 单测）
                compare.py（TOKEN vs KV 同题对比）
+               mixed_check.py（混合模式一致性验证）
                kv_equiv.py / delta_kv.py（KV 等价性 / Delta KV 原型）
 demo/          build_report.py（静态报告）/ app.py（Gradio 工作台）
 docs/          服务器部署清单.md / 实验室对接需求.md
+config.yaml    讨论拓扑配置（1+1 / 1+N）
 ```
 
 ## 实验流程（对应 steps.md）
@@ -64,6 +76,13 @@ docs/          服务器部署清单.md / 实验室对接需求.md
 
 Delta KV（Step10）：只传新增位置的 KV，压缩比随 prompt 长度 3.1x→50x，
 5 档长度等价性全部通过（`eval/delta_kv_table.md`）。
+
+混合模式（助教要求：A 传 TOKEN / B 传 KV）：`eval/mixed_check.py` 5 题与纯文本
+管线逐题一致；`transport/discuss.py` 跨机多轮讨论数学 3/5（迷宫 0/5，
+0.6B 空间推理不足，待 4B）。
+
+走迷宫第二任务：`eval/maze.py` 20 道（5x5/7x7，BFS 最短路为参考，路径合法性
+自动判定），Demo 页渲染迷宫图 + 参考路径。
 
 提示词实验发现：CoT 长链引导在 0.6B 上反而使严格通过率 42%→28%
 （小模型撑不起长链推理）；"简短解答 + 末尾只给数字"最优。

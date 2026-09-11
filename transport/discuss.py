@@ -24,6 +24,8 @@ def p_b_math(q, a1): return f"Question: {q}\nFirst answer: {a1}\nCriticize brief
 def p_a2_math(q, a1, c): return f"Question: {q}\nFirst: {a1}\nCritic: {c}\nGive the final number only.\nFinal:"
 def p_b_maze(grid, p1): return f"Maze:\n{grid}\nProposed path: {p1}\nCheck each step for wall collisions. Give the corrected full move sequence at the very end.\nCritic:"
 def p_a2_maze(grid, p1, c): return f"Maze:\n{grid}\nFirst path: {p1}\nCritic: {c}\nGive the final move sequence only.\nFinal:"
+def p_v_math(q, draft): return f"Question: {q}\nCritic draft: {draft}\nVerify the reasoning and give the final corrected number at the very end.\nVerify:"
+def p_v_maze(grid, draft): return f"Maze:\n{grid}\nCritic draft: {draft}\nVerify each step for wall collisions and give the final move sequence at the very end.\nVerify:"
 
 tok = None; model = None
 def load_model():
@@ -58,20 +60,29 @@ def judge(task, item, a2):
     ok, _, _ = check_path(item["grid_obj"], mv)
     return ok
 
-def run_b(tp):
+def run_b(tp, agents=("critic",)):
     while True:
         mtype, data, meta = recv_payload(tp, timeout=600)
         if meta.get("task") == "END":
             print("B: discussion ended.", flush=True); break
         assert mtype == "TOKEN"
         task, q, a1, rnd = meta["task"], meta["question"], data.decode("utf-8"), meta["round"]
-        prompt = p_b_math(q, a1) if task == "math" else p_b_maze(meta["grid"], a1)
-        critic, kv, seq, dt = gen_with_kv(prompt)
+        grid = meta.get("grid", "")
+        text, kv, seq, dt_total = "", None, None, 0.0
+        prev = a1
+        chain = []
+        for ag in agents:
+            if ag == "critic":
+                prompt = p_b_math(q, prev) if task == "math" else p_b_maze(grid, prev)
+            else:  # verifier 及后续: 在上一智能体输出上继续校验
+                prompt = p_v_math(q, prev) if task == "math" else p_v_maze(grid, prev)
+            text, kv, seq, dt = gen_with_kv(prompt)
+            dt_total += dt; prev = text; chain.append(ag)
         raw = serialize_kv(kv)
         send_kv(tp, raw, hop="B->A", mode="KV", n_bytes=len(raw), ids=seq.tolist(),
-                infer_s=dt, round=rnd)
-        log("discuss_b", task=task, round=rnd, infer_s=dt, kv_bytes=len(raw))
-        print(f"B: round{rnd} replied ({len(raw)}B KV).", flush=True)
+                infer_s=round(dt_total, 2), round=rnd, chain="+".join(chain))
+        log("discuss_b", task=task, round=rnd, infer_s=round(dt_total, 2), kv_bytes=len(raw), chain="+".join(chain))
+        print(f"B: round{rnd} chain={'+'.join(chain)} replied ({len(raw)}B KV).", flush=True)
 
 def run_a(tp, task, n):
     items = ([{"q": q, "answer": a} for q, a, _, _ in SELFMADE[:n]] if task == "math"
@@ -115,25 +126,35 @@ def run_a(tp, task, n):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--role", choices=["a", "b"], required=True)
-    ap.add_argument("--host", default="127.0.0.1")
-    ap.add_argument("--port", type=int, default=5102)
-    ap.add_argument("--task", choices=["math", "maze"], default="math")
-    ap.add_argument("--n", type=int, default=5)
+    ap.add_argument("--host", default=None)
+    ap.add_argument("--port", type=int, default=None)
+    ap.add_argument("--task", choices=["math", "maze"], default=None)
+    ap.add_argument("--n", type=int, default=None)
+    ap.add_argument("--config", default=str(Path(ROOT) / "config.yaml"))
     args = ap.parse_args()
+    import yaml
+    cfg = yaml.safe_load(open(args.config, encoding="utf-8"))
+    host = args.host or cfg["b"]["host"]
+    port = args.port or cfg["b"]["port"]
+    task = args.task or cfg["discuss"]["task"]
+    n = args.n or cfg["discuss"]["n"]
+    global MAX_ROUNDS
+    MAX_ROUNDS = cfg["discuss"].get("max_rounds", 2)
+    agents = tuple(cfg["b"].get("agents", ["critic"]))
     load_model()
     if args.role == "b":
-        print("B listening...", flush=True)
-        tp = TcpTransport(host=args.host, port=args.port, is_server=True)
-        run_b(tp)
+        print(f"B listening... agents={'+'.join(agents)}", flush=True)
+        tp = TcpTransport(host=host, port=port, is_server=True)
+        run_b(tp, agents)
     else:
         tp = None
         for i in range(30):
             try:
-                tp = TcpTransport(host=args.host, port=args.port, is_server=False); break
+                tp = TcpTransport(host=host, port=port, is_server=False); break
             except ConnectionRefusedError:
                 print(f"wait server...{i}", flush=True); time.sleep(10)
         if tp is None: raise ConnectionError("server not ready")
-        run_a(tp, args.task, args.n)
+        run_a(tp, task, n)
     tp.close()
 
 if __name__ == "__main__":
