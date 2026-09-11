@@ -24,6 +24,17 @@ python demo/app.py             # 交互工作台 http://127.0.0.1:7860
 > 说明：跨机讨论（TCP/IP）已撤回——实验室采用实验设备通信而非网络，
 > 待设备接口文档到位后以新 Transport 实现对接（Step9）。
 
+## 服务器一键部署（Ubuntu）
+
+```bash
+bash scripts/setup.sh                        # 默认 Qwen/Qwen3-4B；显存<16GB 自动 4bit
+bash scripts/setup.sh --model Qwen/Qwen3-4B --4bit   # 强制量化
+LLM_MODEL=Qwen/Qwen3-4B bash scripts/run_eval.sh     # 50题对比 + Delta KV + 重建报告
+```
+
+`LLM_MODEL` 环境变量切换模型（不设则默认 0.6B，本地行为不变）；
+`eval/model_loader.py` 按显存自动选 float16/4bit/CPU。详见 `docs/服务器部署清单.md`。
+
 ## 目录结构
 
 ```

@@ -3,30 +3,29 @@
 验证: 不同prompt长度下 压缩比 = 全量KV/deltaKV, 且B端续生成与A端直推逐token一致.
 适配 transformers 5.x DynamicCache.
 """
-import sys, time, io, copy
+import sys, time, copy
 from pathlib import Path
 ROOT = str(Path(__file__).resolve().parents[1]); sys.path.insert(0, ROOT)
 import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM
 from telemetry.logger import log
+from eval.model_loader import load_causal, model_id, model_device
 
-MODEL = "Qwen/Qwen3-0.6B"
+MODEL = model_id()
 K_STEP, M_STEP = 16, 24
 LENGTHS = [50, 100, 200, 400, 800]
 
 BASE_TEXT = ("The quick brown fox jumps over the lazy dog. Machine learning systems process "
              "information through neural networks that learn patterns from data. ")
 
-tok = AutoTokenizer.from_pretrained(MODEL, trust_remote_code=True)
-model = AutoModelForCausalLM.from_pretrained(MODEL, dtype=torch.float32, trust_remote_code=True)
-model.eval()
+tok, model = load_causal(MODEL)
+DEV = model_device(model)
 
 
 def pad_prompt(n):
     ids = tok(BASE_TEXT, return_tensors="pt")["input_ids"]
     while ids.shape[1] < n:
         ids = torch.cat([ids, ids], dim=1)
-    return ids[:, :n]
+    return ids[:, :n].to(DEV)
 
 
 def to_pure(kv):

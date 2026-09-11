@@ -3,30 +3,29 @@ import sys, time
 from pathlib import Path
 ROOT = str(Path(__file__).resolve().parents[1]); sys.path.insert(0, ROOT)
 import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM
 from transport.adapter import serialize_kv, deserialize_kv
 from telemetry.logger import log
 from eval.dataset import load_dataset
 from eval.check_answer import is_correct
+from eval.model_loader import load_causal, model_id, model_device
 
-MODEL = "Qwen/Qwen3-0.6B"
+MODEL = model_id()
 K, M = 16, 112
 MAX_N = 128
 
 PROMPT_TMPL = "Question: {q}\nSolve it briefly. End your answer with the final number only.\nAnswer:"
 
-tok = AutoTokenizer.from_pretrained(MODEL, trust_remote_code=True)
-model = AutoModelForCausalLM.from_pretrained(MODEL, dtype=torch.float32, trust_remote_code=True)
-model.eval()
+tok, model = load_causal(MODEL)
+DEV = model_device(model)
 
 def gen_full(prompt, n):
-    ids = tok(prompt, return_tensors="pt")["input_ids"]; t0=time.time()
+    ids = tok(prompt, return_tensors="pt")["input_ids"].to(DEV); t0=time.time()
     with torch.no_grad():
         out = model.generate(input_ids=ids, max_new_tokens=n, do_sample=False)
-    return tok.decode(out[0][ids.shape[1]:], skip_special_tokens=True), round(time.time()-t0,2), int(out[0].shape[0]-ids.shape[1])
+    return tok.decode(out[0].cpu()[ids.shape[1]:], skip_special_tokens=True), round(time.time()-t0,2), int(out[0].shape[0]-ids.shape[1])
 
 def gen_prefix_kv(prompt, k):
-    ids = tok(prompt, return_tensors="pt")["input_ids"]; t0=time.time()
+    ids = tok(prompt, return_tensors="pt")["input_ids"].to(DEV); t0=time.time()
     with torch.no_grad():
         out = model(ids, use_cache=True); kv = out.past_key_values
         nxt = out.logits[:,-1,:].argmax(-1, keepdim=True); seq = torch.cat([ids,nxt],1)
@@ -46,7 +45,7 @@ def cont_from_kv(seq, kv, m):
             seq = torch.cat([seq, last], dim=1)
             if last.item() == tok.eos_token_id:
                 break
-    return tok.decode(seq[0], skip_special_tokens=True), round(time.time() - t0, 2)
+    return tok.decode(seq[0].cpu(), skip_special_tokens=True), round(time.time() - t0, 2)
 
 def main():
     ds = load_dataset()
@@ -78,7 +77,7 @@ def main():
     s_k = sum(r["kv_strict"] for r in rows); l_k = sum(r["kv_loose"] for r in rows)
     at = sum(r["tok_s"] for r in rows) / n; ak = sum(r["kv_s"] for r in rows) / n
     bt = sum(r["tok_bytes"] for r in rows) / n; bk = sum(r["kv_bytes"] for r in rows) / n
-    md = ["## 总体 (50题, Qwen3-0.6B 本机CPU)", "| 模式 | 严格通过 | 宽松通过 | 平均时延 | 平均传输量 |",
+    md = [f"## 总体 ({n}题, {MODEL})", "| 模式 | 严格通过 | 宽松通过 | 平均时延 | 平均传输量 |",
           "|---|---|---|---|---|",
           f"| TOKEN | {s_t}/{n} ({s_t/n*100:.0f}%) | {l_t}/{n} | {at:.2f}s | {bt:.0f}B |",
           f"| KV | {s_k}/{n} ({s_k/n*100:.0f}%) | {l_k}/{n} | {ak:.2f}s | {bk:.0f}B |", ""]

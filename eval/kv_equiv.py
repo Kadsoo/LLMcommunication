@@ -3,17 +3,16 @@ import sys, time, io
 from pathlib import Path
 ROOT = str(Path(__file__).resolve().parents[1]); sys.path.insert(0, ROOT)
 import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM
 from transport.adapter import serialize_kv, deserialize_kv
 from telemetry.logger import log
+from eval.model_loader import load_causal, model_id, model_device
 
-MODEL = "Qwen/Qwen3-0.6B"
+MODEL = model_id()
 PROMPT = "The capital of France is"
 K, M = 8, 8  # A生成K个, B续M个
 
-tok = AutoTokenizer.from_pretrained(MODEL, trust_remote_code=True)
-model = AutoModelForCausalLM.from_pretrained(MODEL, dtype=torch.float32, trust_remote_code=True)
-model.eval()
+tok, model = load_causal(MODEL)
+DEV = model_device(model)
 
 def step_forward(input_id, kv=None):
     with torch.no_grad():
@@ -22,7 +21,7 @@ def step_forward(input_id, kv=None):
     return nxt, out.past_key_values
 
 # A侧: 从prompt逐步生成K步
-ids = tok(PROMPT, return_tensors="pt")["input_ids"]
+ids = tok(PROMPT, return_tensors="pt")["input_ids"].to(DEV)
 kv = None; t0 = time.time()
 with torch.no_grad():
     out = model(input_ids=ids, use_cache=True); kv = out.past_key_values
@@ -42,13 +41,13 @@ seqB = seq.clone(); last = seq[:, -1:]; t0 = time.time()
 for _ in range(M):
     last, kv2 = step_forward(last, kv2); seqB = torch.cat([seqB, last], dim=1)
 tB = round(time.time() - t0, 2)
-txtB = tok.decode(seqB[0], skip_special_tokens=True)
+txtB = tok.decode(seqB[0].cpu(), skip_special_tokens=True)
 
 # 基线: 单机直推K+M步
-ids0 = tok(PROMPT, return_tensors="pt")["input_ids"]
+ids0 = tok(PROMPT, return_tensors="pt")["input_ids"].to(DEV)
 with torch.no_grad():
     base = model.generate(**{"input_ids": ids0}, max_new_tokens=K+M, do_sample=False)
-txt0 = tok.decode(base[0], skip_special_tokens=True)
+txt0 = tok.decode(base[0].cpu(), skip_special_tokens=True)
 
 print("KV续写:", txtB)
 print("单机直推:", txt0)
