@@ -22,15 +22,6 @@ h1, h2, h3 { color: #dbe4f0 !important; }
 
 CTL = {"procs": [], "running": False, "error": "", "started_at": 0}
 
-def _wait_port(host, port, timeout=120):
-    t0 = time.time()
-    while time.time() - t0 < timeout:
-        try:
-            s = socket.create_connection((host, port), timeout=3); s.close(); return True
-        except OSError:
-            time.sleep(3)
-    return False
-
 def _spawn(args):
     logf = open(ROOT / "telemetry" / "discuss_proc.log", "a", encoding="utf-8")
     p = subprocess.Popen([sys.executable, "transport/discuss.py"] + args,
@@ -44,12 +35,13 @@ def start_discussion(role, peer_ip, port, task, n):
     port = int(port); n = int(n)
     try:
         if role == "single":
+            # 注意: 不能用端口探测等B就绪(探测连接会被B的单次accept吃掉);
+            # A端自带30次重连, B加载模型约1分钟, 直接起A即可
             _spawn(["--role", "b", "--port", str(port)])
-            if not _wait_port("127.0.0.1", port, timeout=180):
-                raise RuntimeError("B端未在180s内就绪(可能模型加载慢), 请重试")
+            time.sleep(5)
             _spawn(["--role", "a", "--host", "127.0.0.1", "--port", str(port),
                     "--task", task, "--n", str(n)])
-            return "已启动: 单机一键AB, 讨论进行中, 时间线将实时弹出"
+            return "已启动: 单机一键AB(B先加载模型约1分钟, A自动重连), 时间线将实时弹出"
         if role == "a":
             _spawn(["--role", "a", "--host", peer_ip, "--port", str(port),
                     "--task", task, "--n", str(n)])

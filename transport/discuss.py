@@ -66,7 +66,8 @@ def run_b(tp, agents=("critic",)):
         try:
             mtype, data, meta = recv_payload(tp, timeout=60)
         except Exception:
-            continue  # 等待对端中; 工作台停止按钮直接杀进程
+            time.sleep(1)  # 等待对端中, 避免空转烧CPU; 工作台停止按钮直接杀进程
+            continue
         if meta.get("task") == "END":
             print("B: discussion ended.", flush=True); break
         assert mtype == "TOKEN"
