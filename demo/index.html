@@ -63,6 +63,42 @@ td.mz.s{background:var(--gr)}td.mz.e{background:var(--rd)}
 </div>
 <div class="note"><b>关键验证：</b>修正 KV 模式停止策略（与 TOKEN 同为生成到 EOS）后，两模式 50 题逐题结果完全一致（严格/宽松均同）—— 证明 KV 传输无损、与直推等价；0.6B 正确率 44% 是模型能力上限（GSM8K 3/20），非流程缺陷。</div>
 
+<h2>智能体选型与对话模式</h2>
+<div class="note"><b>结论：</b>协作优于直答（fixed 52% vs single 44%），动态停止省约17%计算量（46.2s vs 57.0s/题）只掉1题；critic 选温和复核（mild 54%胜strict 46%），但简单题上严格挑错占优。</div>
+<h3>对话模式对比 (50题, Qwen/Qwen3-0.6B)</h3>
+<table class='summary-table'>
+<tr><th>模式</th><th>严格通过</th><th>宽松通过</th><th>平均生成次数</th><th>平均时延</th></tr>
+<tr><td>single</td><td>22/50 (44%)</td><td>31/50</td><td>1.0</td><td>23.3s</td></tr>
+<tr><td>fixed</td><td>26/50 (52%)</td><td>31/50</td><td>3.0</td><td>57.0s</td></tr>
+<tr><td>dynamic</td><td>25/50 (50%)</td><td>33/50</td><td>2.5</td><td>46.2s</td><td></td><td>平均轮次 1.20</td></tr>
+</table>
+<h3>分题型严格通过率</h3>
+<table class='summary-table'>
+<tr><th>题型</th><th>single</th><th>fixed</th><th>dynamic</th></tr>
+<tr><td>arithmetic</td><td>4/6</td><td>4/6</td><td>4/6</td></tr>
+<tr><td>gsm8k</td><td>3/20</td><td>4/20</td><td>4/20</td></tr>
+<tr><td>logic</td><td>3/6</td><td>3/6</td><td>3/6</td></tr>
+<tr><td>ratio</td><td>4/6</td><td>6/6</td><td>6/6</td></tr>
+<tr><td>units</td><td>2/6</td><td>4/6</td><td>2/6</td></tr>
+<tr><td>word_problem</td><td>6/6</td><td>5/6</td><td>6/6</td></tr>
+</table>
+<h3>Critic选型对比 (50题, A→B→A一轮)</h3>
+<table class='summary-table'>
+<tr><th>critic风格</th><th>严格通过</th><th>宽松通过</th><th>平均时延</th></tr>
+<tr><td>strict</td><td>23/50 (46%)</td><td>34/50</td><td>73.0s</td></tr>
+<tr><td>mild</td><td>27/50 (54%)</td><td>35/50</td><td>69.7s</td></tr>
+</table>
+<h3>分题型严格通过率</h3>
+<table class='summary-table'>
+<tr><th>题型</th><th>strict(严格挑错)</th><th>mild(温和复核)</th></tr>
+<tr><td>arithmetic</td><td>3/6</td><td>4/6</td></tr>
+<tr><td>gsm8k</td><td>1/20</td><td>4/20</td></tr>
+<tr><td>logic</td><td>4/6</td><td>5/6</td></tr>
+<tr><td>ratio</td><td>4/6</td><td>6/6</td></tr>
+<tr><td>units</td><td>5/6</td><td>3/6</td></tr>
+<tr><td>word_problem</td><td>6/6</td><td>5/6</td></tr>
+</table>
+
 <h2>走迷宫题集示例（青色=参考最短路）</h2><div class="mazes"><div class='mazebox'><b>maze5-0</b> · 5×5 · 参考最短 4 步<table class='maze'><tr><td class='mz w'></td><td class='mz w'></td><td class='mz w'></td><td class='mz w'></td><td class='mz w'></td></tr><tr><td class='mz w'></td><td class='mz s'></td><td class='mz o'></td><td class='mz o'></td><td class='mz w'></td></tr><tr><td class='mz w'></td><td class='mz p'></td><td class='mz w'></td><td class='mz o'></td><td class='mz w'></td></tr><tr><td class='mz w'></td><td class='mz p'></td><td class='mz p'></td><td class='mz e'></td><td class='mz w'></td></tr><tr><td class='mz w'></td><td class='mz w'></td><td class='mz w'></td><td class='mz w'></td><td class='mz w'></td></tr></table></div><div class='mazebox'><b>maze5-1</b> · 5×5 · 参考最短 4 步<table class='maze'><tr><td class='mz w'></td><td class='mz w'></td><td class='mz w'></td><td class='mz w'></td><td class='mz w'></td></tr><tr><td class='mz w'></td><td class='mz s'></td><td class='mz o'></td><td class='mz o'></td><td class='mz w'></td></tr><tr><td class='mz w'></td><td class='mz p'></td><td class='mz w'></td><td class='mz o'></td><td class='mz w'></td></tr><tr><td class='mz w'></td><td class='mz p'></td><td class='mz p'></td><td class='mz e'></td><td class='mz w'></td></tr><tr><td class='mz w'></td><td class='mz w'></td><td class='mz w'></td><td class='mz w'></td><td class='mz w'></td></tr></table></div><div class='mazebox'><b>maze5-2</b> · 5×5 · 参考最短 4 步<table class='maze'><tr><td class='mz w'></td><td class='mz w'></td><td class='mz w'></td><td class='mz w'></td><td class='mz w'></td></tr><tr><td class='mz w'></td><td class='mz s'></td><td class='mz o'></td><td class='mz o'></td><td class='mz w'></td></tr><tr><td class='mz w'></td><td class='mz p'></td><td class='mz w'></td><td class='mz o'></td><td class='mz w'></td></tr><tr><td class='mz w'></td><td class='mz p'></td><td class='mz p'></td><td class='mz e'></td><td class='mz w'></td></tr><tr><td class='mz w'></td><td class='mz w'></td><td class='mz w'></td><td class='mz w'></td><td class='mz w'></td></tr></table></div><div class='mazebox'><b>maze5-3</b> · 5×5 · 参考最短 4 步<table class='maze'><tr><td class='mz w'></td><td class='mz w'></td><td class='mz w'></td><td class='mz w'></td><td class='mz w'></td></tr><tr><td class='mz w'></td><td class='mz s'></td><td class='mz p'></td><td class='mz o'></td><td class='mz w'></td></tr><tr><td class='mz w'></td><td class='mz w'></td><td class='mz p'></td><td class='mz o'></td><td class='mz w'></td></tr><tr><td class='mz w'></td><td class='mz o'></td><td class='mz p'></td><td class='mz e'></td><td class='mz w'></td></tr><tr><td class='mz w'></td><td class='mz w'></td><td class='mz w'></td><td class='mz w'></td><td class='mz w'></td></tr></table></div></div>
 
 <h2>分题型严格通过率</h2>
@@ -75,209 +111,99 @@ td.mz.s{background:var(--gr)}td.mz.e{background:var(--rd)}
 
 <h2>多智能体对话 · A → B → A（完整文本）</h2><details class="card ok" open>
 <summary><span class="idx">Q1</span><span class="qt">Janet has 3 apples, she buys 5 more. How many apples in total?</span>
-<span class="badge">✓ 成功</span><span class="meta">终答数字 5 ｜ 51.88s</span></summary>
+<span class="badge">✓ 成功</span><span class="meta">终答数字 8 ｜ 32.85s</span></summary>
 <div class="flow">
-<div class="node a"><h4>A · 初答 <small>384 tokens</small></h4><p>10
-Answer:
-Step 1: Start with the initial number of apples Janet has, which is 3.
-Step 2: Add the number of apples she buys, which is 5.
-Step 3: Add the two numbers together: 3 + 5 = 8.
-Step 4: The total number of apples is 8.
-Answer: 8
-
-Wait, but the answer given is 10. Let me check again. Maybe I made a mistake in the steps. Let me re-calculate.
-
-Step 1: Start with 3 apples.
-Step 2: Add 5 more</p></div>
+<div class="node a"><h4>A · 初答 <small>192 tokens</small></h4><p>8
+Okay, let's see. Janet starts with 3 apples. Then she buys 5 more. So to find out how many apples she has in total, I need to add those two numbers together. That would be 3 plus 5. Let me do the math here. 3 plus</p></div>
 <div class="arrow">↓ B 批评</div>
-<div class="node b"><h4>B · 批评</h4><p>The answer is 8, but the proposed answer is 10. There's a discrepancy here. Let me check again.
-
-Wait, maybe I misread the problem. Let me read it again: "Janet has 3 apples, she buys 5 more. How many apples in total?" So initial 3, plus 5, total 8. But the proposed answer is 10. That suggests there's a mistake. Maybe the problem was stated incorrectly? Or perhaps the question is different? Alternatively, maybe the question is in another language and there's a translation error. For example, maybe "she buys</p></div>
+<div class="node b"><h4>B · 批评</h4><p>The question is about adding two quantities, but the proposed answer is 8. Wait, maybe there's a trick here? Let me think again. If she has 3 and buys 5, adding them gives 8. But sometimes people might make mistakes when adding, like adding 3 and 5 directly.</p></div>
 <div class="arrow">↓ A 修正</div>
 <div class="node c"><h4>A · 终答</h4><p>8
-Answer: 8
-Wait, but the user's answer is 10. Maybe there's a typo in the problem? Let me think again. If Janet has 3 apples, and she buys 5 more, that's 3 + 5 = 8. So the answer should be 8. But the user says the answer is 10. That's conflicting. Maybe the problem was supposed to say she has 5 apples and buys 3? Then 5 + 3 = 8. Still 8. Or maybe the initial number is 5? If she has 5,</p></div>
+
+**Step-by-Step Explanation:**
+1. Start with the initial number of apples: 3.
+2. Add the number of apples bought: 5.
+3. Perform the addition: 3 + 5 = 8.
+4. Therefore, the total number of apples is 8.</p></div>
 </div></details><details class="card ok" >
 <summary><span class="idx">Q2</span><span class="qt">A train goes 60 km in 1 hour. How far in 3 hours?</span>
-<span class="badge">✓ 成功</span><span class="meta">终答数字 1 ｜ 74.28s</span></summary>
+<span class="badge">✓ 成功</span><span class="meta">终答数字 180 ｜ 30.04s</span></summary>
 <div class="flow">
-<div class="node a"><h4>A · 初答 <small>384 tokens</small></h4><p>180 km
-Step-by-step explanation:
-Step 1: The train travels 60 km in 1 hour. So, the speed of the train is 60 km/h.
-Step 2: To find the distance covered in 3 hours, multiply the speed by the time: 60 km/h * 3 hours = 180 km.
-Step 3: Therefore, the train will cover 180 km in 3 hours.
-Answer: 180 km
-Step-by-step explanation:
-Step 1: The train travels 60 km in 1 hour. So</p></div>
+<div class="node a"><h4>A · 初答 <small>192 tokens</small></h4><p>180
+Okay, let's see. The problem says a train travels 60 kilometers in one hour and we need to find out how far it will go in three hours. Hmm.
+
+First, I remember that distance is directly proportional to time when the speed remains constant. So if it takes 1</p></div>
 <div class="arrow">↓ B 批评</div>
-<div class="node b"><h4>B · 批评</h4><p>The answer is CORRECT.
-Step-by-step explanation:
-Step 1: The train travels 60 km in 1 hour. So, the speed of the train is 60 km/h.
-Step 2: To find the distance covered in 3 hours, multiply the speed by the time: 60 km/h * 3 hours = 180 km.
-Step 3: Therefore, the train will cover 180 km in 3 hours.
-Answer: CORRECT
-Step-by-step explanation:
-Step 1: The train travels 60 km in 1 hour. So, the speed</p></div>
+<div class="node b"><h4>B · 批评</h4><p>Maybe not. Let me think again. If it goes 60 km in 1 hour, then in 2 hours, it should be 120 km. In 3 hours, 180 km. Yeah, so the answer is 180. That makes sense because each hour adds</p></div>
 <div class="arrow">↓ A 修正</div>
-<div class="node c"><h4>A · 终答</h4><p>180 km
-Step-by-step explanation:
-Step 1: The train travels 60 km in 1 hour. So, the speed of the train is 60 km/h.
-Step 2: To find the distance covered in 3 hours, multiply the speed by the time: 60 km/h * 3 hours = 180 km.
-Step 3: Therefore, the train will cover 180 km in 3 hours.
-Answer: 180 km
-Step-by-step explanation:
-Step 1: The train travels 60 km in 1 hour. So</p></div>
+<div class="node c"><h4>A · 终答</h4><p>180
+
+**Final Answer**
+The train will travel \boxed{180} kilometers in 3 hours.
+Answer:
+Final: \boxed{180}
+``` 
+
+Wait, but looking back at the original question, the user might have intended for the assistant to write the final answer as boxed</p></div>
 </div></details><details class="card ok" >
 <summary><span class="idx">Q3</span><span class="qt">Debra sees 30 bees leave, half that many return. How many returned?</span>
-<span class="badge">✓ 成功</span><span class="meta">终答数字 15 ｜ 76.59s</span></summary>
+<span class="badge">✓ 成功</span><span class="meta">终答数字 15 ｜ 32.15s</span></summary>
 <div class="flow">
-<div class="node a"><h4>A · 初答 <small>384 tokens</small></h4><p>20
-Step-by-step explanation:
-Step 1: Debra sees 30 bees leave.
-Step 2: Half that many return. Half of 30 is 15.
-Step 3: So, the number of bees that returned is 15.
-Step 4: The answer is 15.
-Answer: 15
-Step-by-step explanation:
-Step 1: Debra sees 30 bees leave.
-Step 2: Half that many return. Half of 30 is 15.
-Step 3: So, the number of bees that returned is 15</p></div>
+<div class="node a"><h4>A · 初答 <small>192 tokens</small></h4><p>15
+Okay, let's see. The problem says Debra sees 30 bees leave, and half that many return. Hmm. So first, I need to figure out how many bees left initially. It says 30 bees leave. Then, half of that number returns. Wait, so half</p></div>
 <div class="arrow">↓ B 批评</div>
-<div class="node b"><h4>B · 批评</h4><p>The answer is 15.
-Step-by-step explanation:
-Step 1: Debra sees 30 bees leave.
-Step 2: Half that many return. Half of 30 is 15.
-Step 3: So, the number of bees that returned is 15.
-Critic: The answer is 15.
-Step-by-step explanation:
-Step 1: Debra sees 30 bees leave.
-Step 2: Half that many return. Half of 30 is 15.
-Step 3: So, the number of bees that returned is 15.
-Critic:</p></div>
+<div class="node b"><h4>B · 批评</h4><p>Maybe the question is phrased as "half that many return," meaning half of the original number? But maybe not. Let me parse again.
+
+Original statement: "Debra sees 30 bees leave, half that many return." So "half that many" refers to the number that leaves. So if</p></div>
 <div class="arrow">↓ A 修正</div>
 <div class="node c"><h4>A · 终答</h4><p>15
 
-Question: Debra sees 30 bees leave, half that many return. How many returned?
-Answer: 15
-
-Step-by-step explanation:
-Step 1: Debra sees 30 bees leave.
-Step 2: Half that many return. Half of 30 is 15.
-Step 3: So, the number of bees that returned is 15.
-Final answer: 15
-
-Step-by-step explanation:
-Step 1: Debra sees 30 bees leave.
-Step 2: Half that many return. Half of 30 is 15.</p></div>
-</div></details><details class="card ok" >
+So, first step: 30 bees leave. Half of that would be 30 divided by 2, which is 15. Therefore, 15 returned. Yep, that makes sense. So the answer should be 15.
+Answer: \boxed{15}</p></div>
+</div></details><details class="card fail" >
 <summary><span class="idx">Q4</span><span class="qt">Tom has 10 dollars, spends 4. How much left?</span>
-<span class="badge">✓ 成功</span><span class="meta">终答数字 3 ｜ 77.21s</span></summary>
+<span class="badge">✗ 失败</span><span class="meta">终答数字 10 ｜ 30.58s</span></summary>
 <div class="flow">
-<div class="node a"><h4>A · 初答 <small>384 tokens</small></h4><p>6
-Answer:
-Step 1: Tom has $10.
-Step 2: He spends $4.
-Step 3: Subtract the amount spent from the total amount.
-10 - 4 = 6.
-Final answer: 6.
-Answer:
-Step 1: Tom has $10.
-Step 2: He spends $4.
-Step 3: Subtract the amount spent from the total amount.
-10 - 4 = 6.
-Final answer: 6.
-Answer:
-Step 1: Tom has $10.
-Step 2: He spends $4.
-Step 3: Subtract the</p></div>
+<div class="node a"><h4>A · 初答 <small>192 tokens</small></h4><p>6
+Okay, let's see. Tom starts with $10 and spends $4. So, if I subtract 4 from 10, that would be 10 minus 4. Let me do the math here. 10 minus 4 is 6. Yep, so after spending</p></div>
 <div class="arrow">↓ B 批评</div>
-<div class="node b"><h4>B · 批评</h4><p>The answer is 6.
-Answer:
-Step 1: Tom has $10.
-Step 2: He spends $4.
-Step 3: Subtract the amount spent from the total amount.
-10 - 4 = 6.
-CORRECT.
-Answer:
-Step 1: Tom has $10.
-Step 2: He spends $4.
-Step 3: Subtract the amount spent from the total amount.
-10 - 4 = 6.
-CORRECT.
-Answer:
-Step 1: Tom has $10.
-Step 2: He spends $4.
-Step 3: Subtract the amount spent from</p></div>
+<div class="node b"><h4>B · 批评</h4><p>The question seems to be a simple subtraction problem, but maybe there's something else? Like, does he spend money on something specific? But the way it's phrased, "spends 4" without any context, just subtracts 4 from his total. So unless there's some trick in the numbers</p></div>
 <div class="arrow">↓ A 修正</div>
 <div class="node c"><h4>A · 终答</h4><p>6
+
 Answer:
-Step 1: Tom has $10.
-Step 2: He spends $4.
-Step 3: Subtract the amount spent from the total amount.
-10 - 4 = 6.
-CORRECT.
-Answer:
-Step 1: Tom has $10.
-Step 2: He spends $4.
-Step 3: Subtract the amount spent from the total amount.
-10 - 4 = 6.
-CORRECT.
-Answer:
-Step 1: Tom has $10.
-Step 2: He spends $4.
-Step 3: Subtract the amount spent from the total amount</p></div>
-</div></details><details class="card ok" >
+The correct amount of money Tom has left is $\boxed{6}$.
+Final Answer:
+$\boxed{6}$
+Final Answer:
+$\boxed{6}$
+
+Wait, the user wants the final answer boxed once. Let me check again.
+
+Original question: Tom has 10 dollars,</p></div>
+</div></details><details class="card fail" >
 <summary><span class="idx">Q5</span><span class="qt">2 + 3 * 4 = ?</span>
-<span class="badge">✓ 成功</span><span class="meta">终答数字 14 ｜ 76.76s</span></summary>
+<span class="badge">✗ 失败</span><span class="meta">终答数字 9 ｜ 31.6s</span></summary>
 <div class="flow">
-<div class="node a"><h4>A · 初答 <small>384 tokens</small></h4><p>2 + 3 * 4 = 2 + 12 = 14
+<div class="node a"><h4>A · 初答 <small>192 tokens</small></h4><p>17
 
-Step-by-step explanation:
-Step 1: 2 + 3 * 4 = 2 + 12 = 14
+So, what is the solution to this problem?
 
-So the final answer is 14.
-Answer:
-Step-by-step explanation:
-Step 1: 2 + 3 * 4 = 2 + 12 = 14
-
-So the final answer is 14.
-Answer:
-Step-by-step explanation:
-Step 1: 2 + 3 * 4 = 2 + 12 = 14</p></div>
+Okay, let's see. The problem says "2 + 3 * 4 = ?" and I need to solve it briefly. Hmm, wait a minute, order of operations... right? So multiplication comes before addition in that case. So</p></div>
 <div class="arrow">↓ B 批评</div>
-<div class="node b"><h4>B · 批评</h4><p>The expression is correctly evaluated as 2 + 3 * 4 = 14.
-Answer:
-CORRECT
-Step-by-step explanation:
-Step 1: 2 + 3 * 4 = 2 + 12 = 14
-Critic: The expression is correctly evaluated as 2 + 3 * 4 = 14.
-Answer:
-CORRECT
-Step-by-step explanation:
-Step 1: 2 + 3 * 4 = 2 + 12 = 14
-Critic: The expression is correctly evaluated as 2 + 3 * 4 =</p></div>
+<div class="node b"><h4>B · 批评</h4><p>Let me think again.
+
+Wait, maybe there's a typo here? Because if it was 2 + 3*4, according to PEMDAS (Parentheses, Exponents, Multiplication and Division, Addition and Subtraction), we do 3*4 first, which is 12, then add</p></div>
 <div class="arrow">↓ A 修正</div>
-<div class="node c"><h4>A · 终答</h4><p>14
-Answer:
-14
-Step-by-step explanation:
-Step 1: 2 + 3 * 4 = 2 + 12 = 14
-Critic: The expression is correctly evaluated as 2 + 3 * 4 = 14.
-Answer:
-14
-Step-by-step explanation:
-Step 1: 2 + 3 * 4 = 2 + 12 = 14
-Critic: The expression is correctly evaluated as 2 + 3 * 4 = 14.
-Answer:
-14
-Step-by-step explanation:
-Step</p></div>
+<div class="node c"><h4>A · 终答</h4><p>17
+
+But why did they give me the first answer as 17? Maybe because they thought the operation was done left to right? Like 2+3=5, then 5+4=9? But that would be wrong. Wait, but maybe the original question had different numbers? Or</p></div>
 </div></details>
 
 <h2>系统验证摘要</h2>
 <table><tr><th style="width:180px">项目</th><th>结果</th></tr><tr><td>KV 等价性</td><td>通过 ｜ 2.77 MB / 28 层</td></tr>
 <tr><td>跨进程 TCP (A→B→A)</td><td>网络耗时 12.27s ｜ 双进程真实走网</td></tr>
-<tr><td>TextMAS 单机协作</td><td>5/5 题通过 ｜ 0.6B 分饰 A/B</td></tr></table>
+<tr><td>TextMAS 单机协作</td><td>3/5 题通过 ｜ 0.6B 分饰 A/B</td></tr></table>
 
 <div class="foot">管线：TextMAS → Transport → TCP 跨进程 → Telemetry → KV 传输 → Token/KV 对比 → 可视化。<br>
 下一步：两台服务器改 IP 即真跨机，换 4B 重跑；实验室接口到货后实现 LabTransport。</div>

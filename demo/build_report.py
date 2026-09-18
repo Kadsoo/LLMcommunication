@@ -37,7 +37,37 @@ kv_layers = kv_eq.get("layers", "?")
 net_s = tcp_a.get("net_s", "?")
 tm_ok = sum(1 for r in textmas if r.get("correct")); tm_n = len(textmas)
 
-# ---- 迷宫渲染 ----
+def md_table_to_html(path):
+    """把 '## 标题'+markdown表格 转成 h3+table, 供对话/选型表复用."""
+    p = ROOT / path
+    if not p.exists():
+        return ""
+    out, in_table = [], False
+    for line in p.read_text(encoding="utf-8").splitlines():
+        s = line.strip()
+        if s.startswith("## "):
+            if in_table:
+                out.append("</table>"); in_table = False
+            out.append(f"<h3>{esc(s[3:])}</h3>")
+        elif s.startswith("|"):
+            cells = [esc(c.strip()) for c in s.strip("|").split("|")]
+            if all(set(c) <= set("-: ") for c in cells):
+                continue
+            if not in_table:
+                out.append("<table class='summary-table'>"); in_table = True
+            tag = "th" if "模式" in cells[0] or "题型" in cells[0] or "critic" in cells[0] else "td"
+            out.append("<tr>" + "".join(f"<{tag}>{c}</{tag}>" for c in cells) + "</tr>")
+        elif s:
+            if in_table:
+                out.append("</table>"); in_table = False
+            out.append(f"<p>{esc(s)}</p>")
+    if in_table:
+        out.append("</table>")
+    return "\n".join(out)
+
+
+DIALOGUE_HTML = md_table_to_html("eval/dialogue_table.md")
+ROLE_HTML = md_table_to_html("eval/role_table.md")
 def maze_html(m):
     g = [list(row) for row in m["grid"].split("\n")]
     ref = bfs_path(g)
@@ -169,6 +199,11 @@ td.mz.s{{background:var(--gr)}}td.mz.e{{background:var(--rd)}}
 <div class="k"><div class="k">KV · 严格通过</div><div class="v">{kv_ok}/{len(cmps)} <small>({kv_ok/len(cmps)*100:.0f}%)</small></div><div class="d">端到端 {ak:.1f}s/题 · 宽松 {l_k}/{len(cmps)}</div></div>
 </div>
 <div class="note"><b>关键验证：</b>修正 KV 模式停止策略（与 TOKEN 同为生成到 EOS）后，两模式 50 题逐题结果完全一致（严格/宽松均同）—— 证明 KV 传输无损、与直推等价；0.6B 正确率 44% 是模型能力上限（GSM8K 3/20），非流程缺陷。</div>
+
+<h2>智能体选型与对话模式</h2>
+<div class="note"><b>结论：</b>协作优于直答（fixed 52% vs single 44%），动态停止省约17%计算量（46.2s vs 57.0s/题）只掉1题；critic 选温和复核（mild 54%胜strict 46%），但简单题上严格挑错占优。</div>
+{DIALOGUE_HTML}
+{ROLE_HTML}
 
 <h2>走迷宫题集示例（青色=参考最短路）</h2><div class="mazes">{MAZE_HTML}</div>
 

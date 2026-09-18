@@ -9,6 +9,12 @@ h1, h2, h3 { color: #dbe4f0 !important; }
 .kpi { display: flex; gap: 12px; flex-wrap: wrap; }
 .kpi div { background: #111823; border: 1px solid #1f2a3a; border-radius: 10px; padding: 10px 16px; min-width: 180px; }
 .kpi b { color: #38e1c6; font-size: 20px; font-family: Consolas, monospace; }
+/* Gradio 6.x Dataframe 的 wrap 参数实测不生效，这里用作用域 CSS 强制换行。
+   注意：实测单元格文字直接放在 .cell-wrap 里（没有 span 子元素），所以直接打在 .cell-wrap 上 */
+.wrap-table .cell-wrap { white-space: normal !important; text-overflow: clip !important; overflow: visible !important; overflow-wrap: break-word !important; word-break: break-word !important; align-items: flex-start !important; }
+.wrap-table .cell-wrap span { white-space: normal !important; text-overflow: clip !important; overflow: visible !important; overflow-wrap: break-word !important; word-break: break-word !important; }
+.wrap-table table { table-layout: auto !important; }
+.wrap-table td, .wrap-table th { height: auto !important; }
 """
 
 def load():
@@ -34,24 +40,30 @@ def load():
            f"<div>宽松通过<br><b>{l_t}/{len(cmps)} vs {l_k}/{len(cmps)}</b><br>两模式同数</div>"
            f"<div>KV 无损<br><b>{'✓ EQUIV' if kv.get('equiv') else '?'}</b><br>{fmt(kv.get('kv_bytes', 0))} / {kv.get('layers', '?')}层</div></div>")
     cat_name = {"arithmetic": "算术", "word_problem": "应用题", "ratio": "比例", "logic": "逻辑", "units": "单位换算", "gsm8k": "GSM8K"}
-    qrows = [[r.get("question", "")[:90], cat_name.get(r.get("category", ""), r.get("category", "")),
+    qrows = [[r.get("question", ""), cat_name.get(r.get("category", ""), r.get("category", "")),
               "✓" if r.get("tok_strict") else "✗", r.get("tok_s", ""),
               fmt(r.get("tok_bytes", 0)), "✓" if r.get("kv_strict") else "✗", r.get("kv_s", ""),
               fmt(r.get("kv_bytes", 0))] for r in cmps]
     drows = [[r.get("q", ""), str(r.get("a1", ""))[:200], str(r.get("critic", ""))[:200],
               str(r.get("a2", ""))[:200], "成功" if r.get("correct") else "失败"] for r in textmas]
-    return kpi, qrows, drows
+    def md(name):
+        p = ROOT / "eval" / name
+        return p.read_text(encoding="utf-8") if p.exists() else "暂无数据，先跑对应脚本"
+    return kpi, qrows, drows, md("dialogue_table.md"), md("role_table.md")
 
 def launch():
     import gradio as gr
-    kpi, qrows, drows = load()
+    kpi, qrows, drows, dialogue_md, role_md = load()
     with gr.Blocks(title="LLM通信 Step8") as demo:
         gr.Markdown("# LLM 通信实验台 · Step8\nQwen3-0.6B 本机 · 50题 ｜ 服务器阶段切 4B ｜ Step9 LabTransport 预留")
         gr.HTML(kpi)
+        gr.Markdown("## 智能体选型与对话模式")
+        gr.Markdown(dialogue_md)
+        gr.Markdown(role_md)
         gr.Markdown("## TOKEN vs KV 同题对比（最近50题）")
-        gr.Dataframe(value=qrows, headers=["题目", "题型", "TOKEN", "耗时s", "负载", "KV", "耗时s", "负载"], wrap=True)
+        gr.Dataframe(value=qrows, headers=["题目", "题型", "TOKEN", "耗时s", "负载", "KV", "耗时s", "负载"], wrap=True, elem_classes=["wrap-table"])
         gr.Markdown("## 多智能体对话 A→B→A")
-        gr.Dataframe(value=drows, headers=["问题", "A初答", "B批评", "A终答", "结果"], wrap=True)
+        gr.Dataframe(value=drows, headers=["问题", "A初答", "B批评", "A终答", "结果"], wrap=True, elem_classes=["wrap-table"])
     demo.launch(server_name="0.0.0.0", server_port=7860, css=CSS)
 
 if __name__ == "__main__":

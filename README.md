@@ -86,6 +86,23 @@ Delta KV（Step10）：只传新增位置的 KV，压缩比随 prompt 长度 3.1
 混合模式（A 传 TOKEN / B 传 KV）：`eval/mixed_check.py` 5 题与纯文本
 管线逐题一致（传输层无关实现，设备对接后复用同一协议）。
 
+智能体选型与对话模式（助教重点）：
+
+| 对话模式 | 严格通过 | 说明 |
+|---|---|---|
+| single（直答基线） | 22/50 (44%) | 1 次生成 |
+| fixed（A→B→A 固定一轮） | 26/50 (52%) | 协作 +4 题，3 次生成 |
+| dynamic（B 认可即停） | 25/50 (50%) | 省约 17% 计算（平均轮次 1.2），只掉 1 题 |
+
+| critic 风格 | 严格通过 | 说明 |
+|---|---|---|
+| strict（严格挑错） | 23/50 (46%) | 简单题占优（units 5/6） |
+| mild（温和复核） | 27/50 (54%) | GSM8K 4/20 胜 1/20；小模型上少改错 |
+
+入口：`eval/dialogue_modes.py` / `eval/role_ablation.py`（均支持 `--limit N` 冒烟与
+`--resume` 续跑），结果表 `eval/dialogue_table.md` / `eval/role_table.md`，
+Demo 页同步展示。
+
 走迷宫第二任务：`eval/maze.py` 20 道（5x5/7x7，BFS 最短路为参考，路径合法性
 自动判定），Demo 页渲染迷宫图 + 参考路径。
 
