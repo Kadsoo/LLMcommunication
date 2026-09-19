@@ -53,10 +53,39 @@ def load():
 
 def launch():
     import gradio as gr
+    from demo import chat as chatbe
     kpi, qrows, drows, dialogue_md, role_md = load()
+
+    def on_send(msg, history):
+        history = history + [[msg, "⏳ 生成中…"]]
+        try:
+            reply, dt = chatbe.chat([(h[0], h[1]) for h in history[:-1] if h[1] and not h[1].startswith("⏳")], msg)
+            history[-1][1] = f"{reply}\n\n（{dt}s）"
+        except Exception as e:
+            history[-1][1] = f"出错：{e}"
+        return history, ""
+
+    def on_discuss(msg, history):
+        history = history + [[msg, "⏳ 智能体讨论中（约1分钟）…"]]
+        try:
+            steps = chatbe.discuss(msg)
+            history[-1][1] = "\n\n".join(f"**{role}**（{dt}s）\n{text}" for role, text, dt in steps)
+        except Exception as e:
+            history[-1][1] = f"出错：{e}"
+        return history, ""
+
     with gr.Blocks(title="LLM通信 Step8") as demo:
         gr.Markdown("# LLM 通信实验台 · Step8\nQwen3-0.6B 本机 · 50题 ｜ 服务器阶段切 4B ｜ Step9 LabTransport 预留")
         gr.HTML(kpi)
+        gr.Markdown("## 和智能体聊天")
+        gr.Markdown(f"模型状态：{chatbe.status()}（首次聊天自动加载，约1-2分钟）｜直接聊=和解答智能体自由对话｜看讨论=对你刚发的问题跑 A初答→B批评→A修正")
+        chatbot = gr.Chatbot(value=[], label="聊天", height=420)
+        msg = gr.Textbox(label="输入", placeholder="如：Janet has 3 apples and buys 5 more. How many in total?")
+        with gr.Row():
+            btn_send = gr.Button("发送", variant="primary")
+            btn_discuss = gr.Button("让智能体讨论这个问题")
+        btn_send.click(on_send, [msg, chatbot], [chatbot, msg])
+        btn_discuss.click(on_discuss, [msg, chatbot], [chatbot, msg])
         gr.Markdown("## 智能体选型与对话模式")
         gr.Markdown(dialogue_md)
         gr.Markdown(role_md)
